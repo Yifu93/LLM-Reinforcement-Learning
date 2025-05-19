@@ -17,7 +17,7 @@ import torch
 from transformers import get_linear_schedule_with_warmup
 
 from models.qwen_model import ModelConfig, load_model, load_tokenizer
-from dataloader import get_dataloader
+from scripts.dataloader import get_dataloader
 
 
 def parse_args():
