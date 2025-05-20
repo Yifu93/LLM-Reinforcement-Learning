@@ -17,16 +17,27 @@ Dataset for fine-tuning.
 
 ```
 data/
-└── smoltalk/       # Supervised fine-tuning (SFT) pairs
-└── ultrafeedback/  # RLHF sets → DPO/RLOO
-    ├─ train/
-    └─ test/
+└── smoltalk/          # Supervised fine-tuning (SFT) pairs
+└── ultrafeedback/     # RLHF sets → DPO/RLOO
+└── WarmStart Dataset  # Supervised fine-tuning (SFT) for question-answers
+└── Countdown_dataset  # TinyZero sets → Need Rule-Based Reward Function (DPO/RLOO)
 ```
 
-*Insights*
+**For training:**
+- Preference Datasets:
+    - smoltalk
+    - ultrafeedback (training split)
+- Verifier-Based Datasets: 
+    - Warmstart
+    - Countdown (training split)
 
-* Keep raw text separate from any tokenised/cache format (`data/processed/…`) so you can regenerate with different tokenisers.
-* Capture dataset licenses and citations here; it saves headaches later.
+**For evaluation:**
+- Evaluating Ultrafeedback (test set)
+- Evaluating Countdown (test set)
+
+**Insights**
+
+...
 
 ---
 
