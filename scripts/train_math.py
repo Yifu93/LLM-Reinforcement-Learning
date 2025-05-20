@@ -50,6 +50,7 @@ def main():
         for step, batch in enumerate(dataloader):
             batch = {k: v.cuda() for k, v in batch.items()}
 
+
             if args.task == "sft":
                 loss = model(**batch).loss
             else:
