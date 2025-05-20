@@ -1,7 +1,11 @@
-# Don't track these folders
+# Ignore model and output artifacts
 checkpoints/
 data/
 outputs/
 
-# macOS specific
+# Ignore Python bytecode and metadata
+__pycache__/
+*.py[cod]
+
+# Ignore macOS metadata
 .DS_Store
