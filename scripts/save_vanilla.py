@@ -49,12 +49,12 @@ def parse_args() -> argparse.Namespace:
 def main():
     args = parse_args()
 
-    # # 1️⃣ Download model + tokenizer from Hugging Face
-    # tokenizer = load_tokenizer()
-    # model = load_model(dtype=args.dtype)
+    # 1️⃣ Download model + tokenizer from Hugging Face
+    tokenizer = load_tokenizer()
+    model = load_model(dtype=args.dtype)
 
-    # # 2️⃣ Save to local directory
-    # save_model_and_tokenizer(model, tokenizer, SAVE_DIR)
+    # 2️⃣ Save to local directory
+    save_model_and_tokenizer(model, tokenizer, SAVE_DIR)
 
     # 3️⃣ Reload from saved checkpoint
     tokenizer = load_tokenizer(SAVE_DIR)

@@ -11,15 +11,16 @@ from datasets import load_dataset
 
 
 # Load dataset once from HF Hub
-smoltalk_dataset = load_dataset("HuggingFaceTB/smol-smoltalk", split="train")
-# smoltalk_dataset.save_to_disk("./data/smoltalk")
+smoltalk_dataset = load_dataset("HuggingFaceTB/smol-smoltalk")
+smoltalk_dataset.save_to_disk("./data/smoltalk")
 
 ultrafeedback_dataset = load_dataset("HuggingFaceH4/ultrafeedback_binarized")
-# ultrafeedback_dataset.save_to_disk("./data/ultrafeedback_binarized")
+ultrafeedback_dataset.save_to_disk("./data/ultrafeedback_binarized")
 
 warmstart_dataset = load_dataset("Asap7772/cog_behav_all_strategies")
-# warmstart_dataset.save_to_disk("./data/warmstart")
+warmstart_dataset.save_to_disk("./data/warmstart")
 
 Countdown_dataset = load_dataset("Jiayi-Pan/Countdown-Tasks-3to4")
-# print(Countdowndataset["train"][0])
+Countdown_dataset.save_to_disk("./data/Countdown-Tasks-3to4")
+
 
