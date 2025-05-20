@@ -1,0 +1,7 @@
+# Don't track these folders
+checkpoints/
+data/
+outputs/
+
+# macOS specific
+.DS_Store
