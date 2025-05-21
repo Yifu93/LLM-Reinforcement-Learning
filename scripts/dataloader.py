@@ -101,27 +101,90 @@ def get_smoltalk_dataloader(path="./data/smoltalk/train"):
 
 # ──────────────────────────────────────────────────────────────
 # UltraFeedback Dataset -- for DPO
-# (1) Extract only the prompt, chosen, and rejected
-def select_from_ultrafeedback(example):
-    messages = example.get("messages", [])
-    if len(messages) >= 3 and messages[0]["role"] == "user" and messages[1]["role"] == "assistant" and messages[2]["role"] == "assistant":
-        return {
-            "prompt": messages[0]["content"],
-            "chosen": messages[1]["content"],
-            "rejected": messages[2]["content"],
-        }
-    else:
-        return {
-            "prompt": None,
-            "chosen": None,
-            "rejected": None,
-        }
 
-# (2) Tokenize DPO
+# (1) Tokenize for DPO
+def tokenize_ultrafeedback_dpo(example):
+    prompt = example["prompt"]
+    chosen = example["chosen"][1]['content']
+    rejected = example["rejected"][1]['content']
+    # print("Tokenizing ultrafeedback example:", chosen)
+    base_messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": prompt},
+    ]
 
+    # Tokenize prompt only (to get prompt length)
+    prompt_text = tokenizer.apply_chat_template(
+        base_messages,
+        tokenize=False,
+        add_generation_prompt=True
+    )
+    prompt_tokens = tokenizer(
+        prompt_text,
+        return_tensors="pt",
+        add_special_tokens=False
+    )
+    prompt_len = prompt_tokens["input_ids"].shape[1]
 
+    # Chosen
+    chosen_text = tokenizer.apply_chat_template(
+        base_messages + [{"role": "assistant", "content": chosen}],
+        tokenize=False,
+        add_generation_prompt=False
+    )
+    chosen = tokenizer(
+        chosen_text,
+        max_length=MAX_LENGTH,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt",
+        add_special_tokens=False
+    )
 
-# (3) Build the ultrafeedback DataLoader
+    # Rejected
+    rejected_text = tokenizer.apply_chat_template(
+        base_messages + [{"role": "assistant", "content": rejected}],
+        tokenize=False,
+        add_generation_prompt=False
+    )
+    rejected = tokenizer(
+        rejected_text,
+        max_length=MAX_LENGTH,
+        padding="max_length",
+        truncation=True,
+        return_tensors="pt",
+        add_special_tokens=False
+    )
+
+    return {
+        "chosen_input_ids": chosen["input_ids"][0],
+        "chosen_attention_mask": chosen["attention_mask"][0],
+        "rejected_input_ids": rejected["input_ids"][0],
+        "rejected_attention_mask": rejected["attention_mask"][0],
+        "prompt_length": prompt_len
+    }
+
+# (2) Build the DataLoader
+def get_ultrafeedback_dataloader_dpo(path="./data/ultrafeedback_binarized/train_prefs"):
+    ds = load_from_disk(path)
+    # Expand later
+    ds = ds.select(range(2)) 
+    
+    ds = ds.filter(lambda x: x["prompt"] and x["chosen"] and x["rejected"])
+    print(ds)
+    ds = ds.map(tokenize_ultrafeedback_dpo, batched=False, remove_columns=ds.column_names)
+
+    print(ds)
+
+    ds.set_format(type="torch", columns=[
+        "chosen_input_ids", "chosen_attention_mask",
+        "rejected_input_ids", "rejected_attention_mask",
+        "prompt_length"
+    ])
+    # During DPO loss computation, the prompt portion (which is identical for chosen and rejected) 
+    # is ignored when computing reward differences. 
+    # prompt_length helps the trainer know where to start scoring.
+    return DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, collate_fn=default_data_collator)
 
 # ──────────────────────────────────────────────────────────────
 # WarmStart Dataset -- for SFT
@@ -179,7 +242,7 @@ def get_WarmStart_dataloader(path="./data/warmstart/train"):
 
     # Convert to PyTorch tensors
     ds.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
-    
+
     return DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, collate_fn=default_data_collator)
 
 
@@ -201,22 +264,25 @@ if __name__ == "__main__":
     # (1) Load smolTalk dataset (for SFT)
     smoltalk_train_path = "./data/smoltalk/train"
     smoltalk_dl = get_smoltalk_dataloader(smoltalk_train_path)
-    print("Dataloader created for smoltalk training.")
+    print(">>>>>>>> Dataloader created for smoltalk training.")
 
     # (2) Load ultrafeedback dataset (for DPO)
-    ultrafeedback_train_path = "./data/ultrafeedback_binarized/train"
+    ultrafeedback_train_path = "./data/ultrafeedback_binarized/train_prefs"
+    ultrafeedback_dl = get_ultrafeedback_dataloader_dpo(ultrafeedback_train_path)
+    print(">>>>>>>> Dataloader created for ultrafeedback training.")
 
     # (3) Load ultrafeedback dataset (for RLOO)
+    # TODO: to be implemented
 
     # (4) Load warmstart dataset (for SFT)
     warmstart_train_path = "./data/warmstart/train"
     warmstart_dl = get_WarmStart_dataloader(warmstart_train_path)
-    print("Dataloader created for warmstart training.")
+    print(">>>>>>>> Dataloader created for warmstart training.")
     # (5) Load countdown dataset (for DPO/RLOO)
-
+    # TODO: to be implemented
 
     # # -----------------------
-    # # Use for testing
+    # # Use for testing SFT
     # batch = next(iter(warmstart_dl))
     # print("Batch keys:", batch.keys())
 
@@ -242,3 +308,54 @@ if __name__ == "__main__":
 
     # print("\nDecoded labels (only response):")
     # print(decoded_labels)
+
+    # # -----------------------
+    # # Test for DPO
+    # batch = next(iter(ultrafeedback_dl))
+    # print("Batch keys:", batch.keys())
+
+    # # Check batch shapes
+    # print("chosen_input_ids shape:", batch["chosen_input_ids"].shape)
+    # print("rejected_input_ids shape:", batch["rejected_input_ids"].shape)
+    # print("prompt_length shape:", batch["prompt_length"].shape)
+
+    # # Take first sample in batch
+    # chosen_ids = batch["chosen_input_ids"][0]
+    # rejected_ids = batch["rejected_input_ids"][0]
+    # prompt_len = batch["prompt_length"][0].item()
+
+    # # Decode full sequences
+    # decoded_chosen = tokenizer.decode(
+    #     [id for id in chosen_ids if id != tokenizer.pad_token_id],
+    #     skip_special_tokens=True
+    # )
+    # decoded_rejected = tokenizer.decode(
+    #     [id for id in rejected_ids if id != tokenizer.pad_token_id],
+    #     skip_special_tokens=True
+    # )
+
+    # # Decode prompt only
+    # decoded_prompt = tokenizer.decode(
+    #     [id for id in chosen_ids[:prompt_len] if id != tokenizer.pad_token_id],
+    #     skip_special_tokens=True
+    # )
+
+    # # Decode only the chosen/rejected response
+    # decoded_chosen_resp = tokenizer.decode(
+    #     [id for id in chosen_ids[prompt_len:] if id != tokenizer.pad_token_id],
+    #     skip_special_tokens=True
+    # )
+    # decoded_rejected_resp = tokenizer.decode(
+    #     [id for id in rejected_ids[prompt_len:] if id != tokenizer.pad_token_id],
+    #     skip_special_tokens=True
+    # )
+
+    # # Display
+    # print("\nDecoded prompt:")
+    # print(decoded_prompt)
+
+    # print("\nDecoded chosen response:")
+    # print(decoded_chosen_resp)
+
+    # print("\nDecoded rejected response:")
+    # print(decoded_rejected_resp)
