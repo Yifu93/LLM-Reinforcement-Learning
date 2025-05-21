@@ -9,12 +9,13 @@
 
 
 from datasets import load_from_disk
+import torch
 from torch.utils.data import DataLoader
 from models.qwen_model import load_tokenizer
 from transformers import default_data_collator
 
 # Constants
-SAVE_DIR = "./checkpoints/initial"
+SAVE_DIR = "./qwen2_model"
 BATCH_SIZE = 8
 MAX_LENGTH = 1024  # Max length for the model
 
@@ -61,6 +62,8 @@ def tokenize_SmolTalk_sft(example):
 
     input_ids = full_tokens["input_ids"][0]
     attention_mask = full_tokens["attention_mask"][0]
+    position_ids = torch.cumsum(attention_mask, dim=0) - 1
+    position_ids.masked_fill_(attention_mask == 0, 0)
     labels = input_ids.clone()
 
     # Mask out the prompt portion
@@ -70,13 +73,28 @@ def tokenize_SmolTalk_sft(example):
     return {
         "input_ids": input_ids.tolist(),
         "attention_mask": attention_mask.tolist(),
+        "position_ids": position_ids.tolist(),
         "labels": labels.tolist(),
     }
+
+def get_smoltalk_dataset(path="./data/smoltalk/train"):
+    ds = load_from_disk(path) 
+    ds = ds.map(select_from_smoltalk)
+    ds = ds.filter(lambda x: x["prompt"] and x["response"])
+
+    ds = ds.map(
+        tokenize_SmolTalk_sft,
+        batched=False,
+        remove_columns=ds.column_names,
+    )
+
+    ds.set_format(type="torch", columns=["input_ids", "attention_mask", "position_ids", "labels"])
+    return ds
+
 
 # (3) Build the smoltalk DataLoader
 def get_smoltalk_dataloader(path="./data/smoltalk/train"):
     ds = load_from_disk(path)
-    ds = ds.select(range(2))  # Use more data later if needed
     # print("Before filtering:", ds)
 
     # Extract prompt/response
@@ -98,6 +116,19 @@ def get_smoltalk_dataloader(path="./data/smoltalk/train"):
     ds.set_format(type="torch", columns=["input_ids", "attention_mask", "labels"])
 
     return DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, collate_fn=default_data_collator)
+
+def get_warmstart_dataset(path="./data/warmstart/train"):
+    ds = load_from_disk(path)
+    ds = ds.filter(lambda x: x["query"] and x["completion"])
+
+    ds = ds.map(
+        tokenize_WarmStart_sft,
+        batched=False,
+        remove_columns=ds.column_names,
+    )
+
+    ds.set_format(type="torch", columns=["input_ids", "attention_mask", "position_ids", "labels"])
+    return ds
 
 # ──────────────────────────────────────────────────────────────
 # UltraFeedback Dataset -- for DPO
@@ -167,14 +198,8 @@ def tokenize_ultrafeedback_dpo(example):
 # (2) Build the DataLoader
 def get_ultrafeedback_dataloader_dpo(path="./data/ultrafeedback_binarized/train_prefs"):
     ds = load_from_disk(path)
-    # Expand later
-    ds = ds.select(range(2)) 
-    
     ds = ds.filter(lambda x: x["prompt"] and x["chosen"] and x["rejected"])
-    print(ds)
     ds = ds.map(tokenize_ultrafeedback_dpo, batched=False, remove_columns=ds.column_names)
-
-    print(ds)
 
     ds.set_format(type="torch", columns=[
         "chosen_input_ids", "chosen_attention_mask",
@@ -197,37 +222,51 @@ def tokenize_WarmStart_sft(example):
         {"role": "assistant", "content": example["completion"]},
     ]
 
-    # Tokenize prompt-only (system + user) without padding
+    # Tokenize prompt-only (system + user), used to calculate prompt_len
     prompt_only = tokenizer.apply_chat_template(
         messages[:-1],
         tokenize=False,
-        add_generation_prompt=True  # ends at <|im_start|>assistant\n
+        add_generation_prompt=True  # ends with <|im_start|>assistant\n
     )
     prompt_tokens = tokenizer(prompt_only, return_tensors="pt", add_special_tokens=False)
 
     # Tokenize full prompt + response
-    full_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
-    full_tokens = tokenizer(full_text, return_tensors="pt", padding="max_length", truncation=True, max_length=MAX_LENGTH, add_special_tokens=False)
+    full_text = tokenizer.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=False
+    )
+    full_tokens = tokenizer(
+        full_text,
+        return_tensors="pt",
+        padding="max_length",
+        truncation=True,
+        max_length=MAX_LENGTH,
+        add_special_tokens=False
+    )
 
     input_ids = full_tokens["input_ids"][0]
     attention_mask = full_tokens["attention_mask"][0]
-    labels = input_ids.clone()
 
-    # Mask out the prompt portion
+    # Compute position_ids: needed for Qwen2 rotary embeddings
+    position_ids = torch.cumsum(attention_mask, dim=0) - 1
+    position_ids.masked_fill_(attention_mask == 0, 0)
+
+    # Create labels and mask prompt portion
+    labels = input_ids.clone()
     prompt_len = prompt_tokens["input_ids"].shape[1]
-    labels[:prompt_len] = -100
+    labels[:prompt_len] = -100  # ignore prompt in loss
 
     return {
         "input_ids": input_ids.tolist(),
         "attention_mask": attention_mask.tolist(),
+        "position_ids": position_ids.tolist(),
         "labels": labels.tolist(),
     }
 
 # (2) Build the WarmStart DataLoader
 def get_WarmStart_dataloader(path="./data/warmstart/train"):
     ds = load_from_disk(path)
-    ds = ds.select(range(2))  # Use more data later if needed
-    # print("Before filtering:", ds[0])
 
     # Drop blank ones
     ds = ds.filter(lambda x: x["query"] and x["completion"])
