@@ -49,19 +49,18 @@ def main():
     train_dataset = get_smoltalk_dataset("./data/smoltalk/train")
 
     training_args = TrainingArguments(
-        output_dir="./sft_qwen_lora",
-        per_device_train_batch_size=4,
+        output_dir="./sft",
+        per_device_train_batch_size=16,
         num_train_epochs=3,
         learning_rate=1e-5,
         weight_decay=0.01,
         warmup_steps=100,
         logging_steps=10,
-        save_steps=500,
-        save_total_limit=2,
+        save_steps=4000,
         report_to="none",
         fp16=torch.cuda.is_available(),
         remove_unused_columns=False,
-        dataloader_num_workers=4,  
+        dataloader_num_workers=2,  
     )
 
     trainer = Trainer(
@@ -76,8 +75,8 @@ def main():
     )
 
     trainer.train()
-    model.save_pretrained("./sft_qwen_lora")
-    tokenizer.save_pretrained("./sft_qwen_lora")
+    model.save_pretrained("./sft")
+    tokenizer.save_pretrained("./sft")
 
 if __name__ == "__main__":
     main()
