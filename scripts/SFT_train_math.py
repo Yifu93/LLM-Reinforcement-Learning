@@ -7,7 +7,7 @@ from transformers import (
     TrainerCallback,
 )
 from models.qwen_model import load_tokenizer
-from scripts.dataloader import get_smoltalk_dataset  
+from scripts.dataloader import get_warmstart_dataset  # 已 tokenized 的 warmstart 数据集
 
 # Optional: Callback to log loss to terminal and file
 class PrintLossCallback(TrainerCallback):
@@ -28,12 +28,11 @@ def main():
     # Load model
     model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
 
-    # Load dataset
-    train_dataset = get_smoltalk_dataset("./data/smoltalk/train")
+    train_dataset = get_warmstart_dataset("./data/warmstart/train")  # ensure correct subdir
 
     # Training arguments
     training_args = TrainingArguments(
-        output_dir="./sft_qwen_model",
+        output_dir="./sft_qwen_warmstart_model",
         per_device_train_batch_size=4,
         num_train_epochs=3,
         learning_rate=1e-5,
@@ -46,20 +45,20 @@ def main():
         evaluation_strategy="no",
         report_to="none",
         fp16=torch.cuda.is_available(),
-        remove_unused_columns=False,
+        remove_unused_columns=False,  
     )
 
     trainer = Trainer(
         model=model,
         args=training_args,
         tokenizer=tokenizer,
-        train_dataset=train_dataset,  
+        train_dataset=train_dataset,
         callbacks=[PrintLossCallback()],
     )
 
     # Train and save
     trainer.train()
-    trainer.save_model("./sft_qwen_model")
+    trainer.save_model("./sft_qwen_warmstart_model")
 
 if __name__ == "__main__":
     main()
