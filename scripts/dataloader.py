@@ -6,13 +6,12 @@ from transformers import default_data_collator
 
 # Constants
 SAVE_DIR = "./qwen2_model"
-BATCH_SIZE = 8
-MAX_LENGTH = 1024  # For causal LM context window
+BATCH_SIZE = 4
+MAX_LENGTH = 512
 
 # Load tokenizer globally (used in all tokenizers)
 tokenizer = load_tokenizer(SAVE_DIR)
 tokenizer.pad_token = tokenizer.eos_token
-
 
 # ──────────────────────────────────────────────
 # SmolTalk Dataset (SFT)
@@ -25,88 +24,132 @@ def select_from_smoltalk(example):
         }
     return {"prompt": None, "response": None}
 
+def tokenize_SmolTalk_sft_batch(examples):
+    prompts = examples["prompt"]
+    responses = examples["response"]
 
-def tokenize_SmolTalk_sft(example):
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": example["prompt"]},
-        {"role": "assistant", "content": example["response"]},
+    batch_messages = [
+        [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": p},
+            {"role": "assistant", "content": r},
+        ]
+        for p, r in zip(prompts, responses)
     ]
-    prompt_only = tokenizer.apply_chat_template(messages[:-1], tokenize=False, add_generation_prompt=True)
-    prompt_tokens = tokenizer(prompt_only, return_tensors="pt", add_special_tokens=False)
 
-    full_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
-    full_tokens = tokenizer(full_text, return_tensors="pt", padding="max_length", truncation=True,
-                            max_length=MAX_LENGTH, add_special_tokens=False)
+    prompt_texts = [
+        tokenizer.apply_chat_template(m[:-1], tokenize=False, add_generation_prompt=True)
+        for m in batch_messages
+    ]
+    full_texts = [
+        tokenizer.apply_chat_template(m, tokenize=False, add_generation_prompt=False)
+        for m in batch_messages
+    ]
 
-    input_ids = full_tokens["input_ids"][0]
-    attention_mask = full_tokens["attention_mask"][0]
-    position_ids = torch.cumsum(attention_mask, dim=0) - 1
-    position_ids.masked_fill_(attention_mask == 0, 0)
+    prompt_tokenized = tokenizer(prompt_texts, add_special_tokens=False)
+    full_tokenized = tokenizer(
+        full_texts,
+        padding="max_length",
+        truncation=True,
+        max_length=MAX_LENGTH,
+        add_special_tokens=False,
+    )
 
-    labels = input_ids.clone()
-    prompt_len = prompt_tokens["input_ids"].shape[1]
-    labels[:prompt_len] = -100
+    input_ids_list, attention_mask_list, position_ids_list, labels_list = [], [], [], []
+
+    for input_ids, attention_mask, prompt_ids in zip(full_tokenized["input_ids"], full_tokenized["attention_mask"], prompt_tokenized["input_ids"]):
+        input_ids = torch.tensor(input_ids)
+        attention_mask = torch.tensor(attention_mask)
+        position_ids = torch.cumsum(attention_mask, dim=0) - 1
+        position_ids[attention_mask == 0] = 0
+
+        labels = input_ids.clone()
+        labels[:len(prompt_ids)] = -100
+
+        input_ids_list.append(input_ids.tolist())
+        attention_mask_list.append(attention_mask.tolist())
+        position_ids_list.append(position_ids.tolist())
+        labels_list.append(labels.tolist())
 
     return {
-        "input_ids": input_ids.tolist(),
-        "attention_mask": attention_mask.tolist(),
-        "position_ids": position_ids.tolist(),
-        "labels": labels.tolist(),
+        "input_ids": input_ids_list,
+        "attention_mask": attention_mask_list,
+        "position_ids": position_ids_list,
+        "labels": labels_list,
     }
-
 
 def get_smoltalk_dataset(path="./data/smoltalk/train"):
     ds = load_from_disk(path)
     ds = ds.map(select_from_smoltalk)
     ds = ds.filter(lambda x: x["prompt"] and x["response"])
-    ds = ds.map(tokenize_SmolTalk_sft, batched=False, remove_columns=list(ds.features))
+    ds = ds.map(tokenize_SmolTalk_sft_batch, batched=True, batch_size=32, remove_columns=list(ds.features))
     ds.set_format(type="torch", columns=["input_ids", "attention_mask", "position_ids", "labels"])
     return ds
-
 
 def get_smoltalk_dataloader(path="./data/smoltalk/train"):
     ds = get_smoltalk_dataset(path)
     return DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, collate_fn=default_data_collator)
 
-
 # ──────────────────────────────────────────────
 # WarmStart Dataset (SFT)
+def tokenize_WarmStart_sft_batch(examples):
+    queries = examples["query"]
+    completions = examples["completion"]
 
-def tokenize_WarmStart_sft(example):
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": example["query"]},
-        {"role": "assistant", "content": example["completion"]},
+    batch_messages = [
+        [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": q},
+            {"role": "assistant", "content": c},
+        ]
+        for q, c in zip(queries, completions)
     ]
-    prompt_only = tokenizer.apply_chat_template(messages[:-1], tokenize=False, add_generation_prompt=True)
-    prompt_tokens = tokenizer(prompt_only, return_tensors="pt", add_special_tokens=False)
 
-    full_text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
-    full_tokens = tokenizer(full_text, return_tensors="pt", padding="max_length", truncation=True,
-                            max_length=MAX_LENGTH, add_special_tokens=False)
+    prompt_texts = [
+        tokenizer.apply_chat_template(m[:-1], tokenize=False, add_generation_prompt=True)
+        for m in batch_messages
+    ]
+    full_texts = [
+        tokenizer.apply_chat_template(m, tokenize=False, add_generation_prompt=False)
+        for m in batch_messages
+    ]
 
-    input_ids = full_tokens["input_ids"][0]
-    attention_mask = full_tokens["attention_mask"][0]
-    position_ids = torch.cumsum(attention_mask, dim=0) - 1
-    position_ids.masked_fill_(attention_mask == 0, 0)
+    prompt_tokenized = tokenizer(prompt_texts, add_special_tokens=False)
+    full_tokenized = tokenizer(
+        full_texts,
+        padding="max_length",
+        truncation=True,
+        max_length=MAX_LENGTH,
+        add_special_tokens=False,
+    )
 
-    labels = input_ids.clone()
-    prompt_len = prompt_tokens["input_ids"].shape[1]
-    labels[:prompt_len] = -100
+    input_ids_list, attention_mask_list, position_ids_list, labels_list = [], [], [], []
+
+    for input_ids, attention_mask, prompt_ids in zip(full_tokenized["input_ids"], full_tokenized["attention_mask"], prompt_tokenized["input_ids"]):
+        input_ids = torch.tensor(input_ids)
+        attention_mask = torch.tensor(attention_mask)
+        position_ids = torch.cumsum(attention_mask, dim=0) - 1
+        position_ids[attention_mask == 0] = 0
+
+        labels = input_ids.clone()
+        labels[:len(prompt_ids)] = -100
+
+        input_ids_list.append(input_ids.tolist())
+        attention_mask_list.append(attention_mask.tolist())
+        position_ids_list.append(position_ids.tolist())
+        labels_list.append(labels.tolist())
 
     return {
-        "input_ids": input_ids.tolist(),
-        "attention_mask": attention_mask.tolist(),
-        "position_ids": position_ids.tolist(),
-        "labels": labels.tolist(),
+        "input_ids": input_ids_list,
+        "attention_mask": attention_mask_list,
+        "position_ids": position_ids_list,
+        "labels": labels_list,
     }
-
 
 def get_warmstart_dataset(path="./data/warmstart/train", debug=False):
     ds = load_from_disk(path)
     ds = ds.filter(lambda x: x.get("query") and x.get("completion"))
-    ds = ds.map(tokenize_WarmStart_sft, batched=False, remove_columns=list(ds.features))
+    ds = ds.map(tokenize_WarmStart_sft_batch, batched=True, batch_size=32, remove_columns=list(ds.features))
     ds.set_format(type="torch", columns=["input_ids", "attention_mask", "position_ids", "labels"])
 
     if debug:
@@ -115,50 +158,53 @@ def get_warmstart_dataset(path="./data/warmstart/train", debug=False):
         print("[DEBUG] Decoded label (response only):\n", tokenizer.decode([i for i in sample["labels"] if i != -100 and i != tokenizer.pad_token_id], skip_special_tokens=True))
     return ds
 
-
 def get_warmstart_dataloader(path="./data/warmstart/train"):
     ds = get_warmstart_dataset(path)
     return DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, collate_fn=default_data_collator)
 
-
 # ──────────────────────────────────────────────
 # UltraFeedback Dataset (DPO)
+def tokenize_ultrafeedback_dpo_batch(examples):
+    prompts = examples["prompt"]
+    chosens = [c[1]["content"] for c in examples["chosen"]]
+    rejecteds = [r[1]["content"] for r in examples["rejected"]]
 
-def tokenize_ultrafeedback_dpo(example):
-    prompt = example["prompt"]
-    chosen = example["chosen"][1]["content"]
-    rejected = example["rejected"][1]["content"]
-
-    base_messages = [
+    base_messages = [[
         {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": prompt},
+        {"role": "user", "content": prompt}
+    ] for prompt in prompts]
+
+    prompt_texts = [
+        tokenizer.apply_chat_template(m, tokenize=False, add_generation_prompt=True)
+        for m in base_messages
+    ]
+    prompt_tokenized = tokenizer(prompt_texts, add_special_tokens=False)
+    prompt_lens = [len(p) for p in prompt_tokenized["input_ids"]]
+
+    chosen_texts = [
+        tokenizer.apply_chat_template(m + [{"role": "assistant", "content": c}], tokenize=False)
+        for m, c in zip(base_messages, chosens)
+    ]
+    rejected_texts = [
+        tokenizer.apply_chat_template(m + [{"role": "assistant", "content": r}], tokenize=False)
+        for m, r in zip(base_messages, rejecteds)
     ]
 
-    prompt_text = tokenizer.apply_chat_template(base_messages, tokenize=False, add_generation_prompt=True)
-    prompt_tokens = tokenizer(prompt_text, return_tensors="pt", add_special_tokens=False)
-    prompt_len = prompt_tokens["input_ids"].shape[1]
-
-    chosen_text = tokenizer.apply_chat_template(base_messages + [{"role": "assistant", "content": chosen}], tokenize=False)
-    chosen = tokenizer(chosen_text, return_tensors="pt", padding="max_length", truncation=True,
-                       max_length=MAX_LENGTH, add_special_tokens=False)
-
-    rejected_text = tokenizer.apply_chat_template(base_messages + [{"role": "assistant", "content": rejected}], tokenize=False)
-    rejected = tokenizer(rejected_text, return_tensors="pt", padding="max_length", truncation=True,
-                         max_length=MAX_LENGTH, add_special_tokens=False)
+    chosen_tok = tokenizer(chosen_texts, padding="max_length", truncation=True, max_length=MAX_LENGTH, add_special_tokens=False)
+    rejected_tok = tokenizer(rejected_texts, padding="max_length", truncation=True, max_length=MAX_LENGTH, add_special_tokens=False)
 
     return {
-        "chosen_input_ids": chosen["input_ids"][0],
-        "chosen_attention_mask": chosen["attention_mask"][0],
-        "rejected_input_ids": rejected["input_ids"][0],
-        "rejected_attention_mask": rejected["attention_mask"][0],
-        "prompt_length": prompt_len
+        "chosen_input_ids": chosen_tok["input_ids"],
+        "chosen_attention_mask": chosen_tok["attention_mask"],
+        "rejected_input_ids": rejected_tok["input_ids"],
+        "rejected_attention_mask": rejected_tok["attention_mask"],
+        "prompt_length": prompt_lens,
     }
-
 
 def get_ultrafeedback_dataloader_dpo(path="./data/ultrafeedback_binarized/train_prefs"):
     ds = load_from_disk(path)
     ds = ds.filter(lambda x: x["prompt"] and x["chosen"] and x["rejected"])
-    ds = ds.map(tokenize_ultrafeedback_dpo, batched=False, remove_columns=list(ds.features))
+    ds = ds.map(tokenize_ultrafeedback_dpo_batch, batched=True, batch_size=32, remove_columns=list(ds.features))
     ds.set_format(type="torch", columns=[
         "chosen_input_ids", "chosen_attention_mask",
         "rejected_input_ids", "rejected_attention_mask",

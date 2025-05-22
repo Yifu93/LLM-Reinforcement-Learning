@@ -28,6 +28,7 @@ def main():
     # Load model
     model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
 
+    # ✅ Load warmstart dataset (already tokenized, with position_ids + labels)
     train_dataset = get_warmstart_dataset("./data/warmstart/train")  # ensure correct subdir
 
     # Training arguments
