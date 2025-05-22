@@ -211,6 +211,10 @@ def get_ultrafeedback_dataloader_dpo(path="./data/ultrafeedback_binarized/train_
     # prompt_length helps the trainer know where to start scoring.
     return DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, collate_fn=default_data_collator)
 
+# (3) Build the DataLoader for RLOO
+# The RLOO dataloader is similar to the DPO dataloader, but it uses a different loss function.
+
+
 # ──────────────────────────────────────────────────────────────
 # WarmStart Dataset -- for SFT
 # (1) Tokenize with chat template
