@@ -12,6 +12,7 @@ from transformers import AutoTokenizer
 from pathlib import Path
 
 SAVE_DIR = "./checkpoints/initial"
+# Constants
 DEFAULT_PROMPT = "Using the numbers [95, 36, 32], create an equation that equals 91. " \
     "You can use basic arithmetic operations (+, -, *, /) and each number can only be used once. " \
     "Show your work in <think> </think> tags. " \
@@ -36,7 +37,7 @@ def main():
     args = parse_args()
 
     # Load tokenizer for chat formatting
-    tokenizer = AutoTokenizer.from_pretrained(SAVE_DIR, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained("./checkpoints/initial", trust_remote_code=True)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"

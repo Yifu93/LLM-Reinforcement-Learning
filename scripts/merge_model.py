@@ -19,7 +19,8 @@ def merge_lora_model(lora_dir: str, save_path: str):
     base_model_name = peft_config.base_model_name_or_path
     print(f"📦 Base model: {base_model_name}")
 
-    base_model = load_model("./checkpoints/initial", dtype="bf16")
+    BASE_MODEL_PATH = "./checkpoints/initial"
+    base_model = load_model(BASE_MODEL_PATH, dtype="bf16")
 
     print(f"🔧 Applying LoRA from {lora_dir}")
     lora_model = PeftModel.from_pretrained(base_model, lora_dir)
@@ -32,6 +33,27 @@ def merge_lora_model(lora_dir: str, save_path: str):
 
     print("✅ Merge complete.")
 
+    # Test the merged model
+    print("🔍 Testing merged model...")
+
+    MERGED_MODEL_PATH = "save_path"
+
+    # Load model and tokenizer
+    model = load_model(MERGED_MODEL_PATH, dtype="bf16")
+
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_PATH)
+
+    # Check one inference
+    prompt = "User: Using the numbers [25, 2, 3, 100], create an equation that equals 50. " \
+            "Assistant: Let me solve this step by step. <think>"
+
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    with torch.no_grad():
+        outputs = model.generate(**inputs, max_new_tokens=64)
+
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    print("----- Model Response -----")
+    print(response)
 
 def parse_args():
     parser = argparse.ArgumentParser("Merge a LoRA model into its base model")

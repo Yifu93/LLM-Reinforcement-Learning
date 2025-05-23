@@ -2,6 +2,7 @@
 checkpoints/
 data/
 outputs/
+qwen2_model/
 
 # Ignore Python bytecode and metadata
 __pycache__/
