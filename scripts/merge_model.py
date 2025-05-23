@@ -8,6 +8,8 @@ python -m scripts.merge_model \
 import argparse
 from peft import PeftModel, PeftConfig
 from models.qwen_model import load_model, save_model
+from transformers import AutoTokenizer
+import torch
 
 def merge_lora_model(lora_dir: str, save_path: str):
     """
@@ -19,7 +21,7 @@ def merge_lora_model(lora_dir: str, save_path: str):
     base_model_name = peft_config.base_model_name_or_path
     print(f"📦 Base model: {base_model_name}")
 
-    BASE_MODEL_PATH = "./checkpoints/initial"
+    BASE_MODEL_PATH = "./qwen2_model"  # Path to the base model
     base_model = load_model(BASE_MODEL_PATH, dtype="bf16")
 
     print(f"🔧 Applying LoRA from {lora_dir}")
@@ -31,17 +33,21 @@ def merge_lora_model(lora_dir: str, save_path: str):
     print(f"💾 Saving merged model to {save_path}")
     save_model(merged_model, save_path)
 
+    # 🔧 Save tokenizer so merged model is loadable
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_PATH, trust_remote_code=True)
+    tokenizer.save_pretrained(save_path)
+
     print("✅ Merge complete.")
 
     # Test the merged model
     print("🔍 Testing merged model...")
 
-    MERGED_MODEL_PATH = "save_path"
+    MERGED_MODEL_PATH = save_path
 
     # Load model and tokenizer
     model = load_model(MERGED_MODEL_PATH, dtype="bf16")
 
-    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_PATH)
+    tokenizer = AutoTokenizer.from_pretrained(MERGED_MODEL_PATH)
 
     # Check one inference
     prompt = "User: Using the numbers [25, 2, 3, 100], create an equation that equals 50. " \
