@@ -74,7 +74,13 @@ def extract_math_prompts(ds):
     for ex in ds:
         nums    = ex["nums"]
         target  = ex["target"]
-        prompt  = (f"Using the numbers {nums}, create an equation that equals {target}.")
+        prompt  = (f"A conversation between User and Assistant. "
+                    "The user asks a question, and the Assistant solves it. "
+                    "The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. "
+                    "User: Using the numbers {nums}, create an equation that equals {target}. "
+                    "You can use basic arithmetic operations (+, -, *, /) and each number can only be used once. "
+                    "Show your work in <think> </think> tags. And return the final answer in <answer> </answer> tags, "
+                    "for example <answer> (1 + 2) / 3 </answer>. Assistant: Let me solve this step by step.")
         prompts.append(prompt)
         meta.append({"numbers": nums, "target": target})
     return prompts, meta
