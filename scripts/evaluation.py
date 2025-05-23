@@ -19,6 +19,8 @@ from __future__ import annotations
 import argparse, json, sys, pathlib, random
 from pathlib import Path
 from typing import List, Dict
+import gc
+import torch
 
 # ──────────────────────────────────────────────────────────────
 # 3rd-party deps
@@ -75,12 +77,12 @@ def extract_math_prompts(ds):
         nums    = ex["nums"]
         target  = ex["target"]
         prompt  = (f"A conversation between User and Assistant. "
-                    "The user asks a question, and the Assistant solves it. "
-                    "The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. "
-                    "User: Using the numbers {nums}, create an equation that equals {target}. "
-                    "You can use basic arithmetic operations (+, -, *, /) and each number can only be used once. "
-                    "Show your work in <think> </think> tags. And return the final answer in <answer> </answer> tags, "
-                    "for example <answer> (1 + 2) / 3 </answer>. Assistant: Let me solve this step by step.")
+                   f"The user asks a question, and the Assistant solves it. "
+                   f"The assistant first thinks about the reasoning process in the mind and then provides the user with the answer. "
+                   f"User: Using the numbers {nums}, create an equation that equals {target}. "
+                   f"You can use basic arithmetic operations (+, -, *, /) and each number can only be used once. "
+                   f"Show your work in <think> </think> tags. And return the final answer in <answer> </answer> tags, "
+                   f"for example <answer> (1 + 2) / 3 </answer>. Assistant: Let me solve this step by step.")
         prompts.append(prompt)
         meta.append({"numbers": nums, "target": target})
     return prompts, meta
@@ -229,16 +231,34 @@ def main():
     dtype = normalize_dtype(args.dtype)
 
     print("🔋 Launching vLLM back-ends …")
-    llm_base = LLM(model="./checkpoints/initial", trust_remote_code=True, dtype=dtype)
-    # llm_ft   = LLM(model=args.model_path, trust_remote_code=True, dtype=dtype)
-    llm_ft = llm_base
 
-    # Generation ----------------------------------------------------------------
+    # 1. Load base model, generate responses, then unload
+    print("🔋 Loading base model …")
+    llm_base = LLM(model="./checkpoints/initial", trust_remote_code=True, dtype=dtype)
+
     print("📝 Generating responses with base model …")
     base_replies = generate_batch(llm_base, tok, prompts, samp, args.batch)
 
-    print("📝 Generating responses with fine-tuned model …")
-    ft_replies = generate_batch(llm_ft, tok, prompts, samp, args.batch)
+    # Unload base model to free memory
+    del llm_base
+    torch.cuda.empty_cache()
+    gc.collect()
+
+    # 2. Load fine-tuned model, generate responses, then unload
+    if args.model_path == "./checkpoints/initial":
+        print("⚠ Fine-tuned path is same as base — reusing base replies.")
+        ft_replies = base_replies
+    else:
+        print("🔋 Loading fine-tuned model …")
+        llm_ft = LLM(model=args.model_path, trust_remote_code=True, dtype=dtype)
+
+        print("📝 Generating responses with fine-tuned model …")
+        ft_replies = generate_batch(llm_ft, tok, prompts, samp, args.batch)
+
+        # Unload fine-tuned model (optional, if not needed further)
+        del llm_ft
+        torch.cuda.empty_cache()
+        gc.collect()
 
     # ──────────────────────────────────────────────────────────────────────────
     # Scoring
