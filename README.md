@@ -61,8 +61,13 @@ def save_model(model, save_dir):
 ```
 
 ---
+### Evaluation
+```
+evaluation.py
+```
+<img src="./qwen_project_evaluation.png" alt="Qwen model structure" width="1000" />
 
-### outputs/
+**outputs/** - to record the evaluation responses
 
 **Generated inference** used for offline analysis.
 
