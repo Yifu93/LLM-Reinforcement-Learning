@@ -68,8 +68,11 @@ def compute_score(solution_str, ground_truth, method='strict', format_score=0.1,
     """
     target = ground_truth['target']
     numbers = ground_truth['numbers']
+
+
     
     equation = extract_solution(solution_str=solution_str)
+    # print(f"Extracted equation: {equation}")
     do_print = random.randint(1, 64) == 1
     
     if do_print:

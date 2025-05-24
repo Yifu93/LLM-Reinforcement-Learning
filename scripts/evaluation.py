@@ -10,8 +10,8 @@ Tasks
 
 CLI
 ---
-python -m scripts.evaluation --task math --model-path checkpoints/math_SFT --out outputs/sft_math_score.json
-python -m scripts.evaluation --task text --model-path checkpoints/text_SFT --out outputs/sft_text_score.json
+python -m scripts.evaluation --task math --model-path checkpoints/SFT_WarmStart --out outputs/sft_math_score.json
+python -m scripts.evaluation --task text --model-path checkpoints/merged_SmolTak --out outputs/sft_text_score.json
 """
 
 from __future__ import annotations
@@ -127,9 +127,8 @@ def generate_batch(
         outs  = llm.generate(texts, params)
         for out in outs:
             answer = out.outputs[0].text.split("<|im_end|>")[0].strip()
-            replies.append(answer)
+            replies.append(f"<|im_start|>assistant\n{answer}")
     return replies
-
 
 # ══════════════════════════════════════════════════════════════
 # Scorers
@@ -196,7 +195,7 @@ def save_math_json(path: Path,
         })
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(records, ensure_ascii=False, indent=2))
-    print(f"✔ wrote {path} ({len(records)} items)")
+    print(f">>>> wrote {path} ({len(records)} items)")
 
 
 # ══════════════════════════════════════════════════════════════
@@ -208,7 +207,7 @@ def main():
     # Dataset & prompts ---------------------------------------------------------
     ds_path = EVAL_DATASETS[args.task]
     ds      = load_from_disk(ds_path)
-    ds      = ds.select(random.sample(range(len(ds)), min(100, len(ds))))  # sample 100 items
+    ds      = ds.select(random.sample(range(len(ds)), min(500, len(ds))))  # sample 500 items
 
     if args.task == "math":
         prompts, meta = extract_math_prompts(ds)
@@ -230,13 +229,13 @@ def main():
     )
     dtype = normalize_dtype(args.dtype)
 
-    print("🔋 Launching vLLM back-ends …")
+    print("Launching vLLM back-ends …")
 
     # 1. Load base model, generate responses, then unload
-    print("🔋 Loading base model …")
+    print("Loading base model …")
     llm_base = LLM(model="./checkpoints/initial", trust_remote_code=True, dtype=dtype)
 
-    print("📝 Generating responses with base model …")
+    print("Generating responses with base model …")
     base_replies = generate_batch(llm_base, tok, prompts, samp, args.batch)
 
     # Unload base model to free memory
@@ -246,13 +245,13 @@ def main():
 
     # 2. Load fine-tuned model, generate responses, then unload
     if args.model_path == "./checkpoints/initial":
-        print("⚠ Fine-tuned path is same as base — reusing base replies.")
+        print(">>>! Fine-tuned path is same as base — reusing base replies.")
         ft_replies = base_replies
     else:
-        print("🔋 Loading fine-tuned model …")
+        print(">>> Loading fine-tuned model …")
         llm_ft = LLM(model=args.model_path, trust_remote_code=True, dtype=dtype)
 
-        print("📝 Generating responses with fine-tuned model …")
+        print(">>> Generating responses with fine-tuned model …")
         ft_replies = generate_batch(llm_ft, tok, prompts, samp, args.batch)
 
         # Unload fine-tuned model (optional, if not needed further)
@@ -301,7 +300,7 @@ def main():
         ]
 
         win_rate = sum(1 for i, b in zip(ft_scores, base_scores) if i > b) / len(base_scores)
-        print(f"🏆 win-rate = {win_rate:.3f}")
+        print(f">>>> win-rate = {win_rate:.3f}")
 
         # save
         save_text_json(args.out.with_name("base_text.json"), prompts, base_replies, base_scores)
