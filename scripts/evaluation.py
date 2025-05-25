@@ -49,7 +49,7 @@ def parse_args():
     p.add_argument("--out", type=Path, required=True, help="JSON file for the fine-tuned run")
     p.add_argument("--batch", type=int, default=32)
     p.add_argument("--max-tokens", type=int, default=512)
-    p.add_argument("--temperature", type=float, default=0)
+    p.add_argument("--temperature", type=float, default=0.2)
     p.add_argument("--dtype", choices=["bf16", "fp16", "fp32"], default="bf16")
     return p.parse_args()
 
