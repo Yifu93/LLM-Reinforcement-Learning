@@ -47,7 +47,7 @@ def parse_args():
     p.add_argument("--model-path", required=True, help="fine-tuned checkpoint dir")
     p.add_argument("--base-path", default="checkpoints/initial", help="baseline checkpoint")
     p.add_argument("--out", type=Path, required=True, help="JSON file for the fine-tuned run")
-    p.add_argument("--batch", type=int, default=64)
+    p.add_argument("--batch", type=int, default=128)
     p.add_argument("--max-tokens", type=int, default=1024)
     p.add_argument("--temperature", type=float, default=0)
     p.add_argument("--dtype", choices=["bf16", "fp16", "fp32"], default="bf16")
