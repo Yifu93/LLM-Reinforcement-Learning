@@ -120,7 +120,7 @@ def generate_batch(
     prompts: List[str],
     params: SamplingParams,
     batch_size: int,
-    args.task,
+    task,
 ) -> List[str]:
     replies: List[str] = []
     for group in chunk(prompts, batch_size):
@@ -128,7 +128,7 @@ def generate_batch(
         outs  = llm.generate(texts, params)
         for out in outs:
             answer = out.outputs[0].text.split("<|im_end|>")[0].strip()
-            if args.task == "math":
+            if task == "math":
                 replies.append(f"<|im_start|>assistant\n{answer}")
             else:
                 replies.append(answer)  # ultrafeedback replies already formatted
