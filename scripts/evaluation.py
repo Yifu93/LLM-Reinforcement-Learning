@@ -48,7 +48,7 @@ def parse_args():
     p.add_argument("--base-path", default="checkpoints/initial", help="baseline checkpoint")
     p.add_argument("--out", type=Path, required=True, help="JSON file for the fine-tuned run")
     p.add_argument("--batch", type=int, default=128)
-    p.add_argument("--max-tokens", type=int, default=1024)
+    p.add_argument("--max-tokens", type=int, default=512)
     p.add_argument("--temperature", type=float, default=0)
     p.add_argument("--dtype", choices=["bf16", "fp16", "fp32"], default="bf16")
     return p.parse_args()
@@ -120,6 +120,7 @@ def generate_batch(
     prompts: List[str],
     params: SamplingParams,
     batch_size: int,
+    args.task,
 ) -> List[str]:
     replies: List[str] = []
     for group in chunk(prompts, batch_size):
@@ -127,7 +128,10 @@ def generate_batch(
         outs  = llm.generate(texts, params)
         for out in outs:
             answer = out.outputs[0].text.split("<|im_end|>")[0].strip()
-            replies.append(f"<|im_start|>assistant\n{answer}")
+            if args.task == "math":
+                replies.append(f"<|im_start|>assistant\n{answer}")
+            else:
+                replies.append(answer)  # ultrafeedback replies already formatted
     return replies
 
 # ══════════════════════════════════════════════════════════════
@@ -174,7 +178,7 @@ def save_text_json(path: Path,
         })
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(chats, ensure_ascii=False, indent=2))
-    print(f"✔ wrote {path} ({len(chats)} items)")
+    print(f">>>> wrote {path} ({len(chats)} items)")
 
 
 def save_math_json(path: Path,
@@ -207,7 +211,7 @@ def main():
     # Dataset & prompts ---------------------------------------------------------
     ds_path = EVAL_DATASETS[args.task]
     ds      = load_from_disk(ds_path)
-    ds      = ds.select(random.sample(range(len(ds)), min(1000, len(ds))))  # sample 1000 items
+    ds      = ds.select(random.sample(range(len(ds)), min(500, len(ds))))  # sample 1000 items
 
     if args.task == "math":
         prompts, meta = extract_math_prompts(ds)
@@ -236,7 +240,7 @@ def main():
     llm_base = LLM(model="./checkpoints/initial", trust_remote_code=True, dtype=dtype)
 
     print("Generating responses with base model …")
-    base_replies = generate_batch(llm_base, tok, prompts, samp, args.batch)
+    base_replies = generate_batch(llm_base, tok, prompts, samp, args.batch, args.task)
 
     # Unload base model to free memory
     del llm_base
@@ -252,7 +256,7 @@ def main():
         llm_ft = LLM(model=args.model_path, trust_remote_code=True, dtype=dtype)
 
         print(">>> Generating responses with fine-tuned model …")
-        ft_replies = generate_batch(llm_ft, tok, prompts, samp, args.batch)
+        ft_replies = generate_batch(llm_ft, tok, prompts, samp, args.batch, args.task)
 
         # Unload fine-tuned model (optional, if not needed further)
         del llm_ft
