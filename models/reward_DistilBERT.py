@@ -180,26 +180,26 @@ def train_reward_model(
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # 1️⃣  Tokeniser + special Qwen markers
+    # (1)  Tokeniser + special Qwen markers
     tokenizer = DistilBertTokenizer.from_pretrained("distilbert-base-uncased")
     tokenizer.add_tokens(["<|im_start|>", "<|im_end|>"])
 
-    # 2️⃣  Model (resize after adding tokens)
+    # (2)  Model (resize after adding tokens)
     model = SiameseRewardModel().to(device)
     model.encoder.resize_token_embeddings(len(tokenizer))
 
-    # 3️⃣  DataLoader
+    # (3)  DataLoader
     dataloader = build_ultrafeedback_dataloader(
         path="./data/ultrafeedback_binarized/train_prefs",
         tokenizer=tokenizer,
         batch_size=8,
     )
 
-    # 4️⃣  Optimiser + training
+    # (4)  Optimiser + training
     optimizer = torch.optim.AdamW(model.parameters(), lr=2e-5)
     train_reward_model(model, dataloader, optimizer, device, epochs=3)
 
-    # 5️⃣  Save
+    # (5)  Save
     torch.save(model.state_dict(), "reward_model_trained.pth")
     print("Saved model to reward_model_trained.pth")
 

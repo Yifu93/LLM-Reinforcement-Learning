@@ -47,9 +47,9 @@ def parse_args():
     p.add_argument("--model-path", required=True, help="fine-tuned checkpoint dir")
     p.add_argument("--base-path", default="checkpoints/initial", help="baseline checkpoint")
     p.add_argument("--out", type=Path, required=True, help="JSON file for the fine-tuned run")
-    p.add_argument("--batch", type=int, default=16)
+    p.add_argument("--batch", type=int, default=32)
     p.add_argument("--max-tokens", type=int, default=512)
-    p.add_argument("--temperature", type=float, default=0.2)
+    p.add_argument("--temperature", type=float, default=0)
     p.add_argument("--dtype", choices=["bf16", "fp16", "fp32"], default="bf16")
     return p.parse_args()
 
@@ -207,7 +207,7 @@ def main():
     # Dataset & prompts ---------------------------------------------------------
     ds_path = EVAL_DATASETS[args.task]
     ds      = load_from_disk(ds_path)
-    ds      = ds.select(random.sample(range(len(ds)), min(500, len(ds))))  # sample 500 items
+    ds      = ds.select(random.sample(range(len(ds)), min(1000, len(ds))))  # sample 1000 items
 
     if args.task == "math":
         prompts, meta = extract_math_prompts(ds)
