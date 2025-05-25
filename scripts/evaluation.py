@@ -211,7 +211,7 @@ def main():
     # Dataset & prompts ---------------------------------------------------------
     ds_path = EVAL_DATASETS[args.task]
     ds      = load_from_disk(ds_path)
-    ds      = ds.select(random.sample(range(len(ds)), min(500, len(ds))))  # sample 1000 items
+    ds      = ds.select(random.sample(range(len(ds)), min(1000, len(ds))))  # sample 1000 items
 
     if args.task == "math":
         prompts, meta = extract_math_prompts(ds)
