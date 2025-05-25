@@ -119,8 +119,8 @@ def main():
     trainer.train()
 
     # Save model + tokenizer
-    trainer.save_model("./sft_qwen_math")
-    tokenizer.save_pretrained("./sft_qwen_math")
+    trainer.save_model("./checkpoints/sft_qwen_math_02")
+    tokenizer.save_pretrained("./checkpoints/sft_qwen_math_02")
     print("Training complete and model saved!")
 
 
