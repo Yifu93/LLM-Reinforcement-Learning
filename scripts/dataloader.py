@@ -7,7 +7,7 @@ from transformers import default_data_collator
 # Constants
 SAVE_DIR = "./qwen2_model"
 BATCH_SIZE = 4
-MAX_LENGTH = 512
+MAX_LENGTH = 1024 # Maximum sequence length for tokenization
 
 # Load tokenizer globally (used in all tokenizers)
 tokenizer = load_tokenizer(SAVE_DIR)
