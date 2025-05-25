@@ -8,8 +8,8 @@ from transformers import (
     Trainer,
     TrainerCallback,
 )
+from torch.utils.data import ConcatDataset
 from scripts.dataloader import get_warmstart_dataset
-
 
 class PrintLossCallback(TrainerCallback):
     def __init__(self):
@@ -48,6 +48,7 @@ class SpeedCallback(TrainerCallback):
 def main():
     model_path = "./qwen2_model"
     dataset_path = "./data/warmstart/train"
+    dataset_test_path = "./data/warmstart/test"
 
     # Load tokenizer and model
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
@@ -64,7 +65,9 @@ def main():
 
     # Load dataset (no validation split)
     train_dataset = get_warmstart_dataset(dataset_path)
-    print(f"Dataset loaded: train = {len(train_dataset)}")
+    test_dataset = get_warmstart_dataset(dataset_test_path)
+    combined_dataset = ConcatDataset([train_dataset, test_dataset])
+    print(f"Total samples: {len(combined_dataset)}")
 
     # Training arguments (no validation)
     training_args = TrainingArguments(
