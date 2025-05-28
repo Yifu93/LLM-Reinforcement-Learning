@@ -96,7 +96,7 @@ def main():
 
     # Training arguments
     training_args = TrainingArguments(
-        output_dir="./sft",
+        output_dir="./lora_sft",
         per_device_train_batch_size=16,
         per_device_eval_batch_size=8,
         num_train_epochs=3,
@@ -134,8 +134,8 @@ def main():
     print("Starting training...")
     trainer.train()
 
-    model.save_pretrained("./sft")
-    tokenizer.save_pretrained("./sft")
+    model.save_pretrained("./lora_sft")
+    tokenizer.save_pretrained("./lora_sft")
     print("Training complete and model saved.")
 
 if __name__ == "__main__":

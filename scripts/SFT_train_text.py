@@ -11,6 +11,7 @@ from transformers import (
 )
 from torch.utils.data import random_split
 from scripts.dataloader import get_smoltalk_dataset
+from transformers import DataCollatorForLanguageModeling
 
 class PrintLossCallback(TrainerCallback):
     def __init__(self):
@@ -46,7 +47,10 @@ class SpeedCallback(TrainerCallback):
     def on_step_end(self, args, state, control, **kwargs):
         if self.start_time:
             duration = time.time() - self.start_time
-            print(f"[Step {state.global_step}] Step Time: {duration:.2f}s")
+
+            if state.global_step % 10 == 0:
+                print(f"[Step {state.global_step}] Step Time: {duration:.2f}s")
+
 
 def main():
     model_path = "./qwen2_model"
@@ -59,7 +63,7 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
     model.config.pad_token_id = tokenizer.pad_token_id
 
-    # Add dropout (if supported)
+    # Add dropout
     if hasattr(model.config, "hidden_dropout_prob"):
         model.config.hidden_dropout_prob = 0.1
     if hasattr(model.config, "attention_probs_dropout_prob"):
@@ -82,7 +86,7 @@ def main():
         per_device_train_batch_size=16,
         per_device_eval_batch_size=4,
         learning_rate=1e-5,
-        num_train_epochs=2,
+        num_train_epochs=3,
         weight_decay=0.01,
         warmup_steps=100,
         logging_steps=25,
@@ -101,12 +105,17 @@ def main():
         report_to="none",
     )
     
+    # data_collator = DataCollatorForLanguageModeling(
+    # tokenizer=tokenizer,
+    # mlm=False,  # this is a causal LM
+    # )
 
     # Trainer setup
     trainer = Trainer(
         model=model,
         args=training_args,
         tokenizer=tokenizer,
+        # data_collator=data_collator,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         callbacks=[
@@ -128,3 +137,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

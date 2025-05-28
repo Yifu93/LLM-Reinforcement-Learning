@@ -79,7 +79,7 @@ def main():
         output_dir="./sft_qwen_math",
         per_device_train_batch_size=16,
         learning_rate=5e-6,
-        num_train_epochs=5,
+        num_train_epochs=10,
         weight_decay=0.01,
         warmup_steps=100,
         logging_steps=50,
