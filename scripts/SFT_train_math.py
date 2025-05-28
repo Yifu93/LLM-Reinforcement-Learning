@@ -93,7 +93,7 @@ def main():
         model=model,
         args=training_args,
         tokenizer=tokenizer,
-        train_dataset=train_dataset,
+        train_dataset=combined_dataset,  # Choose which dataset to use
         callbacks=[
             PrintLossCallback(),
             SpeedCallback(),

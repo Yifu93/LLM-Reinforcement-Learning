@@ -43,7 +43,7 @@ data/
 
 
 
-### models/
+### Model
 
 Define the model -- Qwen 2.5 0.5B
 
@@ -58,6 +58,36 @@ def load_model(model_name, quant=None, lora_cfg=None):
 
 def save_model(model, save_dir):
     ...
+```
+
+---
+### Tokenizer
+
+Special tokens:
+```
+151644: <|im_start|>
+
+151645: <|im_end|>
+
+151643: <|endoftext|> (Padding)
+
+198: \n
+```
+
+Example messages:
+```
+<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n
+
+<|im_start|>user\nPrompt text<|im_end|>\n
+
+<|im_start|>assistant\nResponse text<|im_end|>
+```
+
+Masking Strategy:
+```
+labels[:len(prompt_ids)] = -100      # Ignore the prompt part in labels
+
+labels[attention_mask == 0] = -100   # Ensure padding tokens are ignored
 ```
 
 ---
