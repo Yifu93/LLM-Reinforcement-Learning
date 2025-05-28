@@ -77,7 +77,7 @@ def main():
         num_train_epochs=5,
         weight_decay=0.01,
         warmup_steps=100,
-        logging_steps=25,
+        logging_steps=50,
         save_strategy="steps",
         save_steps=200,
         save_total_limit=2,
@@ -105,8 +105,8 @@ def main():
     trainer.train()
 
     # Save model and tokenizer
-    trainer.save_model("./checkpoints/sft_qwen_math_02")
-    tokenizer.save_pretrained("./checkpoints/sft_qwen_math_02")
+    trainer.save_model("./checkpoints/sft_qwen_math_03")
+    tokenizer.save_pretrained("./checkpoints/sft_qwen_math_03")
     print("Training complete and model saved!")
 
 
