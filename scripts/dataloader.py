@@ -64,7 +64,16 @@ def tokenize_SmolTalk_sft_batch(examples):
         position_ids[attention_mask == 0] = 0
 
         labels = input_ids.clone()
-        labels[:len(prompt_ids)] = -100
+        labels[:len(prompt_ids)] = -100   # <|im_start|>assistant will be included?
+        labels[attention_mask == 0] = -100  # Ensure padding tokens are ignored
+
+        # Double-check everything:
+        print(f"----------------------------")
+        print('input_ids:', input_ids)
+        print('attention_mask:', attention_mask)
+        print('position_ids:', position_ids)
+        print('labels:', labels)
+        print(f"----------------------------")
 
         input_ids_list.append(input_ids.tolist())
         attention_mask_list.append(attention_mask.tolist())
@@ -132,7 +141,8 @@ def tokenize_WarmStart_sft_batch(examples):
         position_ids[attention_mask == 0] = 0
 
         labels = input_ids.clone()
-        labels[:len(prompt_ids)] = -100
+        labels[:len(prompt_ids)] = -100   # <|im_start|>assistant will be included?
+        labels[attention_mask == 0] = -100  # Ensure padding tokens are ignored
 
         input_ids_list.append(input_ids.tolist())
         attention_mask_list.append(attention_mask.tolist())

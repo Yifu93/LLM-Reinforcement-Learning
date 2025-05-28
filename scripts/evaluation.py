@@ -29,7 +29,7 @@ from transformers import AutoTokenizer
 try:
     from vllm import LLM, SamplingParams
 except ImportError as e:  # pragma: no cover
-    raise SystemExit("vLLM is required – pip install vllm") from e
+    raise SystemExit("vLLM is required - pip install vllm") from e
 
 from openai import OpenAI
 
