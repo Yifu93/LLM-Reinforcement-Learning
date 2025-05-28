@@ -67,13 +67,13 @@ def tokenize_SmolTalk_sft_batch(examples):
         labels[:len(prompt_ids)] = -100     # Ignore the prompt part in labels
         labels[attention_mask == 0] = -100  # Ensure padding tokens are ignored
 
-        # Double-check everything:
-        print(f"----------------------------")
-        print('input_ids:', input_ids)
-        print('attention_mask:', attention_mask)
-        print('position_ids:', position_ids)
-        print('labels:', labels)
-        print(f"----------------------------")
+        # # Double-check everything:
+        # print(f"----------------------------")
+        # print('input_ids:', input_ids)
+        # print('attention_mask:', attention_mask)
+        # print('position_ids:', position_ids)
+        # print('labels:', labels)
+        # print(f"----------------------------")
 
         input_ids_list.append(input_ids.tolist())
         attention_mask_list.append(attention_mask.tolist())

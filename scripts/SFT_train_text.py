@@ -50,7 +50,7 @@ class SpeedCallback(TrainerCallback):
 
 def main():
     model_path = "./qwen2_model"
-    dataset_path = "./data/smoltalk_dataset/train"
+    dataset_path = "./data/smoltalk/train"
 
     # Load tokenizer and model
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
