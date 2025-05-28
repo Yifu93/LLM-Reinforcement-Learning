@@ -162,11 +162,11 @@ def get_warmstart_dataset(path="./data/warmstart/train", debug=False):
     ds = ds.map(tokenize_WarmStart_sft_batch, batched=True, batch_size=32, remove_columns=list(ds.features))
     ds.set_format(type="torch", columns=["input_ids", "attention_mask", "position_ids", "labels"])
 
-    # if debug:
-    #     sample = ds[0]
-    #     print("\n[DEBUG] Decoded input:\n", tokenizer.decode([i for i in sample["input_ids"] if i != tokenizer.pad_token_id], skip_special_tokens=True))
-    #     print("[DEBUG] Decoded label (response only):\n", tokenizer.decode([i for i in sample["labels"] if i != -100 and i != tokenizer.pad_token_id], skip_special_tokens=True))
-    # return ds
+    if debug:
+        sample = ds[0]
+        print("\n[DEBUG] Decoded input:\n", tokenizer.decode([i for i in sample["input_ids"] if i != tokenizer.pad_token_id], skip_special_tokens=True))
+        print("[DEBUG] Decoded label (response only):\n", tokenizer.decode([i for i in sample["labels"] if i != -100 and i != tokenizer.pad_token_id], skip_special_tokens=True))
+    return ds
 
 def get_warmstart_dataloader(path="./data/warmstart/train"):
     ds = get_warmstart_dataset(path)

@@ -46,7 +46,7 @@ class SpeedCallback(TrainerCallback):
 
 
 def main():
-    model_path = "./qwen2_model"
+    model_path = "checkpoints/initial"
     dataset_path = "./data/warmstart/train"
     dataset_test_path = "./data/warmstart/test"
 
@@ -56,6 +56,8 @@ def main():
 
     model = AutoModelForCausalLM.from_pretrained(model_path, trust_remote_code=True)
     model.config.pad_token_id = tokenizer.pad_token_id
+
+    print(f"Model loaded from {model_path}")
 
     # Set dropout if supported
     if hasattr(model.config, "hidden_dropout_prob"):
@@ -67,7 +69,10 @@ def main():
     train_dataset = get_warmstart_dataset(dataset_path)
     test_dataset = get_warmstart_dataset(dataset_test_path)
     combined_dataset = ConcatDataset([train_dataset, test_dataset])
-    print(f"Total samples: {len(combined_dataset)}")
+
+    if train_dataset is None or test_dataset is None:
+        raise RuntimeError("Failed to load one or both datasets!")
+
 
     # Training arguments (no validation)
     training_args = TrainingArguments(
@@ -105,8 +110,8 @@ def main():
     trainer.train()
 
     # Save model and tokenizer
-    trainer.save_model("./checkpoints/sft_qwen_math_03")
-    tokenizer.save_pretrained("./checkpoints/sft_qwen_math_03")
+    trainer.save_model("./checkpoints/SFT_qwen_math_03")
+    tokenizer.save_pretrained("./checkpoints/SFT_qwen_math_03")
     print("Training complete and model saved!")
 
 
