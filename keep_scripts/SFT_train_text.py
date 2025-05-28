@@ -71,7 +71,7 @@ def main():
 
     # Load dataset - split into train/val
     full_dataset = get_smoltalk_dataset(dataset_path)
-    train_size = int(0.95 * len(full_dataset))  # 95% for training
+    train_size = int(0.91 * len(full_dataset))  # 95% for training
     val_size = len(full_dataset) - train_size
     train_dataset, val_dataset = random_split(
         full_dataset, [train_size, val_size],
@@ -85,23 +85,34 @@ def main():
     print(f"Train size: {len(train_dataset)}, Eval size: {len(eval_dataset)}")
 
 
-    # Training arguments (no validation)
+    # Training settings with split
     training_args = TrainingArguments(
         output_dir="./sft_qwen_text_full",
-        per_device_train_batch_size=32,
-        learning_rate=5e-6,
-        num_train_epochs=2,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=4,
+        learning_rate=1e-5,
+        num_train_epochs=3,
         weight_decay=0.01,
         warmup_steps=100,
-        logging_steps=50,
+        logging_steps=25,
+        evaluation_strategy="steps",
+        eval_steps=50,
         save_strategy="steps",
         save_steps=200,
         save_total_limit=2,
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
         lr_scheduler_type="cosine",
         fp16=torch.cuda.is_available(),
         remove_unused_columns=False,
-        dataloader_num_workers=1,
+        dataloader_num_workers=2,
         report_to="none",
+    )
+    
+    data_collator = DataCollatorForLanguageModeling(
+    tokenizer=tokenizer,
+    mlm=False,  # this is a causal LM
     )
 
     # Trainer setup
@@ -109,10 +120,13 @@ def main():
         model=model,
         args=training_args,
         tokenizer=tokenizer,
-        train_dataset=train_dataset,  # Choose which dataset to use
+        data_collator=data_collator,
+        train_dataset=train_dataset,
+        eval_dataset=eval_dataset,
         callbacks=[
             PrintLossCallback(),
             SpeedCallback(),
+            EarlyStoppingCallback(early_stopping_patience=3),
         ],
     )
 
