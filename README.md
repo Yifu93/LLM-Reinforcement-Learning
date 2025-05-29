@@ -115,8 +115,4 @@ evaluation.py
 
 ---
 
-### README.md
-
----
-
-### requirements.txt
+### enviroment.txt

@@ -88,9 +88,10 @@ def main():
     # Training arguments (no validation)
     training_args = TrainingArguments(
         output_dir="./sft_qwen_text_full",
-        per_device_train_batch_size=32,
+        per_device_train_batch_size=2,
+        gradient_accumulation_steps=8,
         learning_rate=5e-6,
-        num_train_epochs=2,
+        num_train_epochs=1,
         weight_decay=0.01,
         warmup_steps=100,
         logging_steps=50,
