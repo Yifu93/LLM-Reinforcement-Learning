@@ -144,7 +144,7 @@ def write_math(path: Path,
     """
     Submission format (one JSON object per line):
 
-      {"num":[1,2,3], "target":6, "expression":"1+2+3=6"}
+      {"num":[1,2,3], "target":6, "response":"1+2+3=6"}
       …
 
     • `replies[i]` is the raw assistant text (already stripped of <|im_end|>)
@@ -159,7 +159,7 @@ def write_math(path: Path,
             record = {
                 "num":   m["numbers"],
                 "target": m["target"],
-                "expression": expr,
+                "response": expr,
             }
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
