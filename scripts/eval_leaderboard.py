@@ -105,7 +105,8 @@ def generate_replies(
     tok: AutoTokenizer,
     user_prompts: list[str],
     params: SamplingParams,
-    batch: int
+    batch: int,
+    task
 ) -> list[str]:
     replies: list[str] = []
     for grp in chunk(user_prompts, batch):
@@ -113,7 +114,10 @@ def generate_replies(
         outs = llm.generate(full_prompts, params)
         for o in outs:
             ans = o.outputs[0].text.split("<|im_end|>")[0].strip()
-            replies.append(ans)
+            if task == "math":
+                replies.append(f"<|im_start|>assistant\n{ans}")
+            else:
+                replies.append(ans)  # ultrafeedback replies already formatted
     return replies
 
 # ──────────────────────────────────────────────────────────────
@@ -208,7 +212,7 @@ def main():
 
     # ---------- Base model
     base_llm = LLM(model=args.base_path, trust_remote_code=True, dtype=dtype)
-    base_replies = generate_replies(base_llm, tok, prompts, samp, args.batch)
+    base_replies = generate_replies(base_llm, tok, prompts, samp, args.batch, args.task)
     del base_llm; torch.cuda.empty_cache(); gc.collect()
 
     # ---------- Fine-tuned model
@@ -216,7 +220,7 @@ def main():
         ft_replies = base_replies
     else:
         ft_llm = LLM(model=args.model_path, trust_remote_code=True, dtype=dtype)
-        ft_replies = generate_replies(ft_llm, tok, prompts, samp, args.batch)
+        ft_replies = generate_replies(ft_llm, tok, prompts, samp, args.batch, args.task)
         del ft_llm; torch.cuda.empty_cache(); gc.collect()
 
     # ---------- Scoring & saving
