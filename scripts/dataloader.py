@@ -175,7 +175,6 @@ def get_warmstart_dataloader(path="./data/warmstart/train"):
 # ──────────────────────────────────────────────
 # UltraFeedback Dataset (DPO)
 def select_from_ultrafeedback(example):
-    print(example.keys())
     prompt = example.get("prompt")
     chosen = example.get("chosen")[1]["content"]
     rejected = example.get("rejected")[1]["content"]
