@@ -269,7 +269,7 @@ def tokenize_ultrafeedback_dpo_batch(examples):
 
 def get_ultrafeedback_dataset(path="./data/ultrafeedback_binarized/train_prefs"):
     ds = load_from_disk(path)
-    ds = ds.select(range(2))  # For debugging, limit to 2 samples
+    # ds = ds.select(range(2))  # For debugging, limit to 2 samples
     ds = ds.map(select_from_ultrafeedback)
     ds = ds.filter(lambda x: x["prompt"] and x["chosen"] and x["rejected"]) # filter out invalid entries
     ds = ds.map(tokenize_ultrafeedback_dpo_batch, batched=True, batch_size=32, remove_columns=list(ds.features))
@@ -282,10 +282,11 @@ def get_ultrafeedback_dataset(path="./data/ultrafeedback_binarized/train_prefs")
                                          "rejected_position_ids", 
                                          "rejected_labels", 
                                          "prompt_length"])
-    example = ds[0]
-    for key, value in example.items():
-        print(f"\n{key}:")
-        print(value.tolist() if torch.is_tensor(value) else value)
+    
+    # example = ds[0] # test single example
+    # for key, value in example.items():
+    #     print(f"\n{key}:")
+    #     print(value.tolist() if torch.is_tensor(value) else value)
 
     return ds
 
