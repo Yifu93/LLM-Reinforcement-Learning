@@ -175,118 +175,19 @@ def get_warmstart_dataloader(path="./data/warmstart/train"):
 # ──────────────────────────────────────────────
 # UltraFeedback Dataset (DPO)
 def select_from_ultrafeedback(example):
-    prompt = example.get("prompt")
-    chosen = example.get("chosen")[1]["content"]
-    rejected = example.get("rejected")[1]["content"]
+    chosen = example.get("chosen")
+    rejected = example.get("rejected")
 
     return {
-        "prompt": prompt,
         "chosen": chosen,
         "rejected": rejected
     }
-
-def tokenize_ultrafeedback_dpo_batch(examples):
-    prompts = examples["prompt"]
-    chosens = examples["chosen"]
-    rejecteds = examples["rejected"]
-
-    base_messages = [
-        [{"role": "system", "content": "You are a helpful assistant."}, {"role": "user", "content": prompt}]
-        for prompt in prompts
-    ]
-
-    prompt_texts = [
-        tokenizer.apply_chat_template(m, tokenize=False, add_generation_prompt=True)
-        for m in base_messages
-    ]
-
-    prompt_tokenized = tokenizer(prompt_texts, add_special_tokens=False)
-
-    chosen_texts = [
-        tokenizer.apply_chat_template(m + [{"role": "assistant", "content": c}], tokenize=False, add_generation_prompt=False)
-        for m, c in zip(base_messages, chosens)
-    ]
-
-    rejected_texts = [
-        tokenizer.apply_chat_template(m + [{"role": "assistant", "content": r}], tokenize=False, add_generation_prompt=False)
-        for m, r in zip(base_messages, rejecteds)
-    ]
-
-    # Tokenize chosen and rejected texts
-    chosen_tok = tokenizer(chosen_texts, padding="max_length", truncation=True, max_length=MAX_LENGTH, add_special_tokens=False)
-    rejected_tok = tokenizer(rejected_texts, padding="max_length", truncation=True, max_length=MAX_LENGTH, add_special_tokens=False)
-
-    results = {
-        "chosen_input_ids": [],
-        "chosen_attention_mask": [],
-        "chosen_position_ids": [],
-        "chosen_labels": [],
-        "rejected_input_ids": [],
-        "rejected_attention_mask": [],
-        "rejected_position_ids": [],
-        "rejected_labels": [],
-        "prompt_length": [],
-    }
-
-    for i in range(len(prompts)):
-        prompt_len = len(prompt_tokenized["input_ids"][i])
-
-        # Chosen
-        input_ids = torch.tensor(chosen_tok["input_ids"][i])
-        attention_mask = torch.tensor(chosen_tok["attention_mask"][i])
-        position_ids = torch.cumsum(attention_mask, dim=0) - 1
-        position_ids[attention_mask == 0] = 0
-
-        labels = input_ids.clone()
-        labels[:prompt_len] = -100
-        labels[attention_mask == 0] = -100
-
-        results["chosen_input_ids"].append(input_ids.tolist())
-        results["chosen_attention_mask"].append(attention_mask.tolist())
-        results["chosen_position_ids"].append(position_ids.tolist())
-        results["chosen_labels"].append(labels.tolist())
-
-        # Rejected
-        input_ids = torch.tensor(rejected_tok["input_ids"][i])
-        attention_mask = torch.tensor(rejected_tok["attention_mask"][i])
-        position_ids = torch.cumsum(attention_mask, dim=0) - 1
-        position_ids[attention_mask == 0] = 0
-
-        labels = input_ids.clone()
-        labels[:prompt_len] = -100
-        labels[attention_mask == 0] = -100
-
-        results["rejected_input_ids"].append(input_ids.tolist())
-        results["rejected_attention_mask"].append(attention_mask.tolist())
-        results["rejected_position_ids"].append(position_ids.tolist())
-        results["rejected_labels"].append(labels.tolist())
-
-        # Shared prompt length
-        results["prompt_length"].append(prompt_len)
-    
-    return results
 
 def get_ultrafeedback_dataset(path="./data/ultrafeedback_binarized/train_prefs"):
     ds = load_from_disk(path)
     # ds = ds.select(range(2))  # For debugging, limit to 2 samples
     ds = ds.map(select_from_ultrafeedback)
-    ds = ds.filter(lambda x: x["prompt"] and x["chosen"] and x["rejected"]) # filter out invalid entries
-    ds = ds.map(tokenize_ultrafeedback_dpo_batch, batched=True, batch_size=32, remove_columns=list(ds.features))
-    ds.set_format(type="torch", columns=["chosen_input_ids", 
-                                         "chosen_attention_mask", 
-                                         "chosen_position_ids",
-                                         "chosen_labels", 
-                                         "rejected_input_ids", 
-                                         "rejected_attention_mask", 
-                                         "rejected_position_ids", 
-                                         "rejected_labels", 
-                                         "prompt_length"])
-    
-    # example = ds[0] # test single example
-    # for key, value in example.items():
-    #     print(f"\n{key}:")
-    #     print(value.tolist() if torch.is_tensor(value) else value)
-
+    ds = ds.filter(lambda x: x["chosen"] and x["rejected"]) # filter out invalid entries
     return ds
 
 def get_ultrafeedback_dataloader_dpo(path="./data/ultrafeedback_binarized/train_prefs"):

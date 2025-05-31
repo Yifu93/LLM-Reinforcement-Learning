@@ -12,7 +12,7 @@ MODEL_PATH = "checkpoints/merged_SmolTak"
 DATA_PATH = "./data/ultrafeedback_binarized/train_prefs"
 OUTPUT_DIR = "./checkpoints/DPO_ultrafeedback"
 MAX_LENGTH = 1024
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 EPOCHS = 3
 # ──────────────────────────────────────────────────────────────
 
@@ -74,7 +74,7 @@ def main():
         beta=0.1,
         max_length=MAX_LENGTH,
         per_device_train_batch_size=BATCH_SIZE,
-        gradient_accumulation_steps=1,
+        gradient_accumulation_steps=2,
         learning_rate=5e-6,
         num_train_epochs=EPOCHS,
         save_steps=200,
@@ -90,9 +90,8 @@ def main():
     trainer = DPOTrainer(
         model=model,
         args=dpo_args,
-        beta=dpo_args.beta,
         train_dataset=train_dataset,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         callbacks=[
             PrintLossCallback(),
             SpeedCallback(),
