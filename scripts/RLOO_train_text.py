@@ -3,7 +3,6 @@ import torch
 import pandas as pd
 from transformers import AutoTokenizer, TrainerCallback, AutoModelForCausalLM, AutoModelForSequenceClassification
 from trl import RLOOConfig, RLOOTrainer
-from datasets import load_from_disk
 from scripts.dataloader import load_tokenizer, get_rloo_dataset
 
 # ──────────────────────────────────────────────
@@ -74,12 +73,10 @@ def main():
     policy_model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, trust_remote_code=True)
     policy_model.config.pad_token_id = tokenizer.pad_token_id
 
-    # Load reward model and wrap it
     reward_model_raw = AutoModelForSequenceClassification.from_pretrained(REWARD_MODEL_PATH)
     reward_tokenizer = AutoTokenizer.from_pretrained(REWARD_MODEL_PATH)
     reward_model = wrap_reward_model(reward_model_raw, reward_tokenizer, device)
 
-    # Load dataset
     train_dataset = get_rloo_dataset(DATA_PATH)
 
     # Ensure dataset returns (prompt, response) pairs for RLOO
