@@ -3,12 +3,12 @@ import torch
 import pandas as pd
 from transformers import AutoTokenizer, TrainerCallback, AutoModelForCausalLM, AutoModelForSequenceClassification
 from trl import RLOOConfig, RLOOTrainer
-from scripts.dataloader import load_tokenizer, get_rloo_dataset
+from scripts.dataloader import load_tokenizer, get_ultrafeedback_dataset_RLOO
 
 # ──────────────────────────────────────────────
 MODEL_PATH = "checkpoints/merged_SmolTak"
 REWARD_MODEL_PATH = "OpenAssistant/reward-model-deberta-v3-large"
-DATA_PATH = "./data/ultrafeedback_binarized/train_prompts"
+DATA_PATH = "./data/ultrafeedback_binarized/train_gen"
 OUTPUT_DIR = "./checkpoints/RLOO_ultrafeedback"
 MAX_LENGTH = 1024
 BATCH_SIZE = 2
@@ -77,12 +77,7 @@ def main():
     reward_tokenizer = AutoTokenizer.from_pretrained(REWARD_MODEL_PATH)
     reward_model = wrap_reward_model(reward_model_raw, reward_tokenizer, device)
 
-    train_dataset = get_rloo_dataset(DATA_PATH)
-
-    # Ensure dataset returns (prompt, response) pairs for RLOO
-    def preprocess_fn(example):
-        return {"prompt": example["prompt"]}
-    train_dataset = train_dataset.map(preprocess_fn)
+    train_dataset = get_ultrafeedback_dataset_RLOO(DATA_PATH)
 
     rloo_config = RLOOConfig(
         max_length=MAX_LENGTH,

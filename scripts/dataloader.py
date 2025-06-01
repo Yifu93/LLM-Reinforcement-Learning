@@ -186,7 +186,7 @@ def select_from_ultrafeedback(example):
 def get_ultrafeedback_dataset(path="./data/ultrafeedback_binarized/train_prefs"):
     ds = load_from_disk(path)
     # ds = ds.select(range(2))  # For debugging, limit to 2 samples
-    ds = ds.map(select_from_ultrafeedback)
+    ds = ds.map(select_from_ultrafeedback, remove_columns=list(ds.features))
     ds = ds.filter(lambda x: x["chosen"] and x["rejected"]) # filter out invalid entries
     return ds
 
@@ -196,5 +196,15 @@ def get_ultrafeedback_dataloader_dpo(path="./data/ultrafeedback_binarized/train_
 
 # ──────────────────────────────────────────────
 # UltraFeedback Dataset (RLOO)
-# Placeholder
+# Only take prompt into the model, and RLOO trainer will tokenize
 
+def select_from_ultrafeedback_RLOO(example):
+    prompt = example.get("prompt")
+    return {"prompt": prompt}
+
+def get_ultrafeedback_dataset_RLOO(path="./data/ultrafeedback_binarized/train_gen"):
+    ds = load_from_disk(path)
+    # ds = ds.select(range(2))                 # For debugging, limit to 2 samples
+    ds = ds.map(select_from_ultrafeedback_RLOO, remove_columns=list(ds.features))
+    ds = ds.filter(lambda x: x["prompt"])    # filter out invalid entries
+    return ds
