@@ -1,12 +1,10 @@
 import time
 import torch
 import pandas as pd
-import torch.nn.functional as F
 from transformers import AutoTokenizer, TrainerCallback, AutoModelForCausalLM, AutoModelForSequenceClassification
 from trl import RLOOConfig, RLOOTrainer
 from datasets import load_from_disk
-from scripts.dataloader import load_tokenizer
-from scripts.dataloader import get_rloo_dataset
+from scripts.dataloader import load_tokenizer, get_rloo_dataset
 
 # ──────────────────────────────────────────────
 MODEL_PATH = "checkpoints/merged_SmolTak"
@@ -53,12 +51,16 @@ def wrap_reward_model(reward_model, reward_tokenizer, device):
     reward_model.to(device)
     reward_model.eval()
 
-    def compute_reward(texts):
+    def compute_reward(prompt_response_pairs):
+        """
+        prompt_response_pairs: list of (prompt, generated_response) tuples
+        """
+        prompts, responses = zip(*prompt_response_pairs)  # unzip list of tuples
+
         with torch.no_grad():
-            inputs = reward_tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
+            inputs = reward_tokenizer(list(prompts), list(responses), return_tensors="pt", padding=True, truncation=True).to(device)
             outputs = reward_model(**inputs)
-            probs = F.softmax(outputs.logits, dim=-1)
-            rewards = probs[:, 1]  # positive class probability
+            rewards = outputs.logits.squeeze(-1)  # shape: (batch_size,)
         return rewards
 
     return compute_reward
@@ -77,7 +79,13 @@ def main():
     reward_tokenizer = AutoTokenizer.from_pretrained(REWARD_MODEL_PATH)
     reward_model = wrap_reward_model(reward_model_raw, reward_tokenizer, device)
 
+    # Load dataset
     train_dataset = get_rloo_dataset(DATA_PATH)
+
+    # Ensure dataset returns (prompt, response) pairs for RLOO
+    def preprocess_fn(example):
+        return {"prompt": example["prompt"]}
+    train_dataset = train_dataset.map(preprocess_fn)
 
     rloo_config = RLOOConfig(
         max_length=MAX_LENGTH,
@@ -101,7 +109,7 @@ def main():
         config=rloo_config,
         policy=policy_model,
         ref_policy=policy_model,
-        reward_model=reward_model,  
+        reward_model=reward_model,  # callable: (prompt, response) → reward
         train_dataset=train_dataset,
         processing_class=tokenizer,
         callbacks=[PrintLossCallback(), SpeedCallback()],
