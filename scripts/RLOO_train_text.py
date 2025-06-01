@@ -1,14 +1,16 @@
 import time
 import torch
 import pandas as pd
-from transformers import AutoTokenizer, TrainerCallback, AutoModelForCausalLM
-from trl import RLOOConfig, RLOOTrainer, Reward
+import torch.nn.functional as F
+from transformers import AutoTokenizer, TrainerCallback, AutoModelForCausalLM, AutoModelForSequenceClassification
+from trl import RLOOConfig, RLOOTrainer
 from datasets import load_from_disk
 from scripts.dataloader import load_tokenizer
+from scripts.dataloader import get_rloo_dataset
 
 # ──────────────────────────────────────────────
 MODEL_PATH = "checkpoints/merged_SmolTak"
-REWARD_MODEL_PATH = "OpenAssistant/reward-model-deberta-v3-large"  # example pretrained reward model
+REWARD_MODEL_PATH = "OpenAssistant/reward-model-deberta-v3-large"
 DATA_PATH = "./data/ultrafeedback_binarized/train_prompts"
 OUTPUT_DIR = "./checkpoints/RLOO_ultrafeedback"
 MAX_LENGTH = 1024
@@ -47,26 +49,36 @@ class SpeedCallback(TrainerCallback):
             duration = time.time() - self.start_time
             print(f"[Step {state.global_step}] Step Time: {duration:.2f}s")
 
-def get_rloo_dataset(path):
-    ds = load_from_disk(path)
-    ds = ds.filter(lambda x: x.get("prompt") is not None)
-    return ds
+def wrap_reward_model(reward_model, reward_tokenizer, device):
+    reward_model.to(device)
+    reward_model.eval()
+
+    def compute_reward(texts):
+        with torch.no_grad():
+            inputs = reward_tokenizer(texts, return_tensors="pt", padding=True, truncation=True).to(device)
+            outputs = reward_model(**inputs)
+            probs = F.softmax(outputs.logits, dim=-1)
+            rewards = probs[:, 1]  # positive class probability
+        return rewards
+
+    return compute_reward
 
 def main():
-    # Load tokenizer + models
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     tokenizer = load_tokenizer(MODEL_PATH)
     tokenizer.pad_token = tokenizer.eos_token
 
     policy_model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, trust_remote_code=True)
     policy_model.config.pad_token_id = tokenizer.pad_token_id
 
-    # Load pretrained reward model using trl.Reward
-    reward_model = Reward(REWARD_MODEL_PATH)
+    # Load reward model and wrap it
+    reward_model_raw = AutoModelForSequenceClassification.from_pretrained(REWARD_MODEL_PATH)
+    reward_tokenizer = AutoTokenizer.from_pretrained(REWARD_MODEL_PATH)
+    reward_model = wrap_reward_model(reward_model_raw, reward_tokenizer, device)
 
-    # Load dataset (only needs 'prompt')
     train_dataset = get_rloo_dataset(DATA_PATH)
 
-    # RLOO config (note: no need to pass reward_model_path here)
     rloo_config = RLOOConfig(
         max_length=MAX_LENGTH,
         per_device_train_batch_size=BATCH_SIZE,
@@ -80,27 +92,23 @@ def main():
         remove_unused_columns=False,
         fp16=torch.cuda.is_available(),
         report_to="none",
-        num_ppo_epochs=1,  # RLOO uses PPO base
-        rloo_k=4,  # number of completions per prompt
+        num_ppo_epochs=1,
+        rloo_k=4,
         kl_coef=0.03,
     )
 
-    # RLOOTrainer
     trainer = RLOOTrainer(
         config=rloo_config,
         policy=policy_model,
-        ref_policy=policy_model,  # baseline/reference (can also load separately)
-        reward_model=reward_model,
+        ref_policy=policy_model,
+        reward_model=reward_model,  
         train_dataset=train_dataset,
         processing_class=tokenizer,
         callbacks=[PrintLossCallback(), SpeedCallback()],
     )
 
-    # Train
     print("Starting RLOO training...")
     trainer.train()
-
-    # Save final model
     trainer.save_model(OUTPUT_DIR)
     tokenizer.save_pretrained(OUTPUT_DIR)
     print("RLOO training complete and model saved!")
