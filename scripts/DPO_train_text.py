@@ -75,7 +75,7 @@ def main():
         max_length=MAX_LENGTH,
         per_device_train_batch_size=BATCH_SIZE,
         gradient_accumulation_steps=8,
-        learning_rate=5e-6,
+        learning_rate=5e-7,
         num_train_epochs=EPOCHS,
         save_steps=200,
         save_total_limit=2,

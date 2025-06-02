@@ -11,7 +11,8 @@ REWARD_MODEL_PATH = "OpenAssistant/reward-model-deberta-v3-large"
 DATA_PATH = "./data/ultrafeedback_binarized/train_gen"
 OUTPUT_DIR = "./checkpoints/RLOO_ultrafeedback"
 MAX_LENGTH = 1024
-BATCH_SIZE = 2
+BATCH_SIZE = 4
+NUM_GEN_PER_PROMPT = 4
 EPOCHS = 1
 # ──────────────────────────────────────────────
 
@@ -50,19 +51,22 @@ def wrap_reward_model(reward_model, reward_tokenizer, device):
     reward_model.to(device)
     reward_model.eval()
 
-    def compute_reward(prompt_response_pairs):
-        """
-        prompt_response_pairs: list of (prompt, generated_response) tuples
-        """
-        prompts, responses = zip(*prompt_response_pairs)  # unzip list of tuples
-
+    def compute_reward(full_texts):  # ← list of full prompt+response strings
         with torch.no_grad():
-            inputs = reward_tokenizer(list(prompts), list(responses), return_tensors="pt", padding=True, truncation=True).to(device)
-            outputs = reward_model(**inputs)
-            rewards = outputs.logits.squeeze(-1)  # shape: (batch_size,)
-        return rewards
+            inputs = reward_tokenizer(
+                full_texts,
+                return_tensors="pt",
+                padding=True,
+                truncation=True
+            ).to(device)
 
+            outputs = reward_model(**inputs)
+            rewards = outputs.logits.squeeze(-1)
+            # print('rewards:', rewards)
+            return rewards.tolist()
+        
     return compute_reward
+
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -73,6 +77,9 @@ def main():
     policy_model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, trust_remote_code=True)
     policy_model.config.pad_token_id = tokenizer.pad_token_id
 
+    ref_policy_model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, trust_remote_code=True)
+    ref_policy_model.config.pad_token_id = tokenizer.pad_token_id
+
     reward_model_raw = AutoModelForSequenceClassification.from_pretrained(REWARD_MODEL_PATH)
     reward_tokenizer = AutoTokenizer.from_pretrained(REWARD_MODEL_PATH)
     reward_model = wrap_reward_model(reward_model_raw, reward_tokenizer, device)
@@ -80,7 +87,7 @@ def main():
     train_dataset = get_ultrafeedback_dataset_RLOO(DATA_PATH)
 
     rloo_config = RLOOConfig(
-        max_length=MAX_LENGTH,
+        # max_length=MAX_LENGTH,
         per_device_train_batch_size=BATCH_SIZE,
         gradient_accumulation_steps=8,
         learning_rate=5e-6,
@@ -89,18 +96,19 @@ def main():
         save_total_limit=2,
         logging_steps=50,
         output_dir=OUTPUT_DIR,
-        remove_unused_columns=False,
+        remove_unused_columns=True,
         fp16=torch.cuda.is_available(),
+        num_sample_generations = 0, # No evaluation during training
         report_to="none",
-        num_ppo_epochs=1,
-        rloo_k=4,
+        num_ppo_epochs=EPOCHS,
+        rloo_k=NUM_GEN_PER_PROMPT,
         kl_coef=0.03,
     )
 
     trainer = RLOOTrainer(
         config=rloo_config,
         policy=policy_model,
-        ref_policy=policy_model,
+        ref_policy=ref_policy_model,
         reward_model=reward_model,  # callable: (prompt, response) → reward
         train_dataset=train_dataset,
         processing_class=tokenizer,
