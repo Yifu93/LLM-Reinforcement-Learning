@@ -1,7 +1,7 @@
 from datasets import load_dataset
 
 # Download the dataset from Hugging Face Hub
-# -- Preference Dataset --
+# -- Instrcution Following Dataset --
 # (1) SmolTalk (Dataset for SFT): https://huggingface.co/datasets/HuggingFaceTB/smol-smoltalk
 # (2) UltraFeedback (Dataset for DPO and RLOO): https://huggingface.co/datasets/HuggingFaceH4/ultrafeedback_binarized
 # -- Verifier-Based Dataset --
