@@ -218,9 +218,42 @@ def tokenize_ultrafeedback_RLOO(examples):
 
 def get_ultrafeedback_dataset_RLOO(path="./data/ultrafeedback_binarized/train_gen"):
     ds = load_from_disk(path)
-    # ds = ds.select(range(2))                 # For debugging, limit to 2 samples
+    # ds = ds.select(range(100))                 # For debugging, limit to 2 samples
     ds = ds.map(select_from_ultrafeedback_RLOO, remove_columns=list(ds.features))
     ds = ds.filter(lambda x: x["prompt"])    # filter out invalid entries
     ds = ds.map(tokenize_ultrafeedback_RLOO, batched=True, batch_size=32, remove_columns=list(ds.features))
     ds.set_format(type="torch", columns=["input_ids", "attention_mask"])
     return ds
+
+
+# # ──────────────────────────────────────────────
+# # Countdown Dataset (RLOO)
+# # Build prompts into the model, and RLOO trainer will tokenize
+
+# def select_from_Countdown_RLOO(example):
+#     system_prompt = "You are a helpful assistant."  # Or from your dataset
+#     user_prompt = example.get("prompt")
+#     structured_prompt = f"<|im_start|>system\n{system_prompt}<|im_end|>\n" \
+#                         f"<|im_start|>user\n{user_prompt}<|im_end|>\n" \
+#                         f"<|im_start|>assistant\n"
+#     return {"prompt": structured_prompt}
+
+# def tokenize_Countdown_RLOO(examples):
+#     prompts = examples["prompt"]
+#     # Tokenize prompts using the tokenizer
+#     tokenized = tokenizer(prompts, padding="max_length", truncation=True, max_length=MAX_LENGTH, return_tensors="pt")
+
+#     return {
+#         "input_ids": tokenized["input_ids"].tolist(),
+#         "attention_mask": tokenized["attention_mask"].tolist(),
+#     }
+
+# def get_Countdown_dataset_RLOO(path="./data/Countdown-Tasks-3to4/train"):
+#     ds = load_from_disk(path)
+#     print(ds)
+#     # # ds = ds.select(range(2))                 # For debugging, limit to 2 samples
+#     # ds = ds.map(select_from_ultrafeedback_RLOO, remove_columns=list(ds.features))
+#     # ds = ds.filter(lambda x: x["prompt"])    # filter out invalid entries
+#     # ds = ds.map(tokenize_ultrafeedback_RLOO, batched=True, batch_size=32, remove_columns=list(ds.features))
+#     # ds.set_format(type="torch", columns=["input_ids", "attention_mask"])
+#     return ds

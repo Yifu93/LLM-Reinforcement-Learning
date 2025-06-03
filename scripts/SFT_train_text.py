@@ -53,7 +53,7 @@ class SpeedCallback(TrainerCallback):
 
 
 def main():
-    model_path = "./qwen2_model"
+    model_path = "./sft_qwen_text_full/checkpoint-28500"
     dataset_path = "./data/smoltalk/train"
 
     # Load tokenizer and model
@@ -89,14 +89,14 @@ def main():
     training_args = TrainingArguments(
         output_dir="./sft_qwen_text_full",
         per_device_train_batch_size=2,
-        gradient_accumulation_steps=8,
-        learning_rate=5e-6,
+        gradient_accumulation_steps=12,
+        learning_rate=1.76e-7,
         num_train_epochs=1,
         weight_decay=0.01,
         warmup_steps=100,
         logging_steps=50,
         save_strategy="steps",
-        save_steps=200,
+        save_steps=500,
         save_total_limit=2,
         lr_scheduler_type="cosine",
         fp16=torch.cuda.is_available(),
