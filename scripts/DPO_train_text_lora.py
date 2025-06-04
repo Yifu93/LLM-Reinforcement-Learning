@@ -1,19 +1,19 @@
 import time
 import torch
 import pandas as pd
-from transformers import AutoTokenizer, TrainingArguments, TrainerCallback
+from transformers import AutoTokenizer, TrainerCallback
 from trl import DPOTrainer, DPOConfig
-from peft import get_peft_config, get_peft_model, LoraConfig, TaskType
+from peft import get_peft_model, LoraConfig, TaskType
 from transformers import AutoModelForCausalLM
 from scripts.dataloader import get_ultrafeedback_dataset
 
 # ──────────────────────────────────────────────────────────────
-MODEL_PATH = "checkpoints/merged_SmolTak"
-DATA_PATH = "./data/ultrafeedback_binarized/train_prefs"
-OUTPUT_DIR = "./checkpoints/DPO_ultrafeedback_lora"
-MAX_LENGTH = 1024
-BATCH_SIZE = 2
-EPOCHS = 3
+MODEL_PATH  = "checkpoints/merged_SmolTak"
+DATA_PATH   = "./data/ultrafeedback_binarized/train_prefs"
+OUTPUT_DIR  = "./checkpoints/DPO_ultrafeedback_lora"
+MAX_LENGTH  = 1024
+BATCH_SIZE  = 2
+EPOCHS      = 3
 # ──────────────────────────────────────────────────────────────
 
 
@@ -64,33 +64,27 @@ def main():
         base_model.config.attention_probs_dropout_prob = 0.1
 
     # ── 2. Define LoRA configuration ──────────────────────────────────────
-    # May need to adjust `target_modules` to match your model’s Q/K/V projections.
-    # Common choices for a causal‐LM: ["query_key_value"], ["q_proj", "v_proj"], or ["q_proj", "k_proj", "v_proj"].
     lora_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
         inference_mode=False,
-        r=8,                   # LoRA rank
-        lora_alpha=32,         # LoRA α parameter
-        target_modules=["query_key_value"],  
+        r=8,
+        lora_alpha=32,
+        target_modules=["q_proj", "k_proj", "v_proj", "o_proj"],
         lora_dropout=0.05,
-        bias="none"
+        bias="none",
     )
 
-    # ── 3. Wrap base model with LoRA adapters ─────────────────────────────
+    # ── 3. Wrap the base model with LoRA adapters ─────────────────────────
     model = get_peft_model(base_model, lora_config)
+    model.print_trainable_parameters()
     print("LoRA adapters injected. Only LoRA parameters will be trained.")
 
-    # ── 4. Load and format your DPO dataset ──────────────────────────────
-    #    (Your get_ultrafeedback_dataset should return a Dataset where each example
-    #     already has the fields: chosen_input_ids, chosen_attention_mask, chosen_labels,
-    #     rejected_input_ids, rejected_attention_mask, rejected_labels, prompt_length.)
+    # ── 4. Load and format your pre‐tokenized DPO dataset ─────────────────
     train_dataset = get_ultrafeedback_dataset(DATA_PATH)
-
-    # If there's a leftover "prompt" column, drop it so DPOTrainer uses only tokenized inputs:
     if "prompt" in train_dataset.column_names:
         train_dataset = train_dataset.remove_columns("prompt")
 
-    # ── 5. Configure DPOTrainer (hyperparameters go here) ──────────────────
+    # ── 5. Configure DPOTrainer hyperparameters ──────────────────────────
     dpo_config = DPOConfig(
         beta=0.1,
         max_length=MAX_LENGTH,
@@ -102,29 +96,24 @@ def main():
         save_total_limit=2,
         logging_steps=50,
         output_dir=OUTPUT_DIR,
-        remove_unused_columns=False,  # keep all token columns
+        remove_unused_columns=False,
         fp16=torch.cuda.is_available(),
         report_to="none",
     )
 
-    # ── 6. Create DPOTrainer with the LoRA‐wrapped model ───────────────────
+    # ── 6. Create and run DPOTrainer ─────────────────────────────────────
     trainer = DPOTrainer(
         model=model,
         args=dpo_config,
         train_dataset=train_dataset,
         processing_class=tokenizer,
-        callbacks=[
-            PrintLossCallback(),
-            SpeedCallback(),
-        ],
+        callbacks=[PrintLossCallback(), SpeedCallback()],
     )
 
-    # ── 7. Train ───────────────────────────────────────────────────────────
     print("Starting DPO+LoRA training…")
     trainer.train()
 
-    # ── 8. Save final LoRA adapters ────────────────────────────────────────
-    # You probably only want to save the LoRA weights (not the entire base model).
+    # ── 7. Save only the LoRA adapters ──────────────────────────────────
     model.save_pretrained(OUTPUT_DIR)
     tokenizer.save_pretrained(OUTPUT_DIR)
     print("DPO+LoRA training complete. Adapters saved to:", OUTPUT_DIR)
