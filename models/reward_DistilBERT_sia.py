@@ -89,7 +89,7 @@ def evaluate_reward_model(model, dataloader, device):
 
 import pandas as pd
 
-def train_reward_model(model, train_loader, val_loader, optimizer, device, epochs=10):
+def train_reward_model(model, train_loader, val_loader, optimizer, device, epochs=3):
     model.train()
     logs = []
 
@@ -141,7 +141,7 @@ def train_reward_model(model, train_loader, val_loader, optimizer, device, epoch
         print(f"Epoch {epoch+1} Summary: Train Loss={avg_train_loss:.4f}, Val Loss={avg_val_loss:.4f}, Train Acc={train_acc:.4f}, Val Acc={val_acc:.4f}")
         model.train()
 
-    pd.DataFrame(logs).to_csv("training_log.csv", index=False)
+    pd.DataFrame(logs).to_csv("./checkpoints/reward/sBERT_training_log.csv", index=False)
     print("Training log saved to training_log.csv")
 
 

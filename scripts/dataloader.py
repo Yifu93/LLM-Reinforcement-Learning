@@ -1,8 +1,9 @@
-from datasets import load_from_disk
+from datasets import load_from_disk, Dataset
 import torch
 from torch.utils.data import DataLoader
 from models.qwen_model import load_tokenizer
 from transformers import default_data_collator
+import json
 
 # Constants
 SAVE_DIR = "./qwen2_model"
@@ -171,6 +172,34 @@ def get_warmstart_dataset(path="./data/warmstart/train", debug=False):
 def get_warmstart_dataloader(path="./data/warmstart/train"):
     ds = get_warmstart_dataset(path)
     return DataLoader(ds, batch_size=BATCH_SIZE, shuffle=True, collate_fn=default_data_collator)
+
+
+def get_math_syn_dataset(path="./data/synthetic_data/all_math.json", debug=False):
+    with open(path, "r") as f:
+        raw_data = json.load(f)
+
+    # Convert the list of data into the huggingface dataset
+    hf_dataset = Dataset.from_list(raw_data)
+
+    hf_dataset = hf_dataset.filter(lambda x: x.get("query") and x.get("completion"))
+
+    # Tokenize using same logic
+    hf_dataset = hf_dataset.map(
+        tokenize_WarmStart_sft_batch,
+        batched=True,
+        batch_size=32,
+        remove_columns=list(hf_dataset.features),
+    )
+
+    hf_dataset.set_format(type="torch", columns=["input_ids", "attention_mask", "position_ids", "labels"])
+
+    if debug:
+        sample = hf_dataset[0]
+        print("\n[DEBUG] Decoded input:\n", tokenizer.decode([i for i in sample["input_ids"] if i != tokenizer.pad_token_id], skip_special_tokens=True))
+        print("[DEBUG] Decoded label (response only):\n", tokenizer.decode([i for i in sample["labels"] if i != -100 and i != tokenizer.pad_token_id], skip_special_tokens=True))
+
+    return hf_dataset
+
 
 # ──────────────────────────────────────────────
 # UltraFeedback Dataset (DPO)

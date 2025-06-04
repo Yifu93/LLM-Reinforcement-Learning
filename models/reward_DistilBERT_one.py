@@ -99,7 +99,7 @@ def evaluate_reward_model(model, dataloader, device):
     return correct / total
 
 
-def train_reward_model(model, train_loader, val_loader, optimizer, device, epochs=10):
+def train_reward_model(model, train_loader, val_loader, optimizer, device, epochs=3):
     logs = []
 
     for epoch in range(epochs):
@@ -157,7 +157,7 @@ def train_reward_model(model, train_loader, val_loader, optimizer, device, epoch
 
         print(f"[Epoch {epoch+1}] Train Loss = {avg_train_loss:.4f}, Val Loss = {avg_val_loss:.4f}")
 
-    pd.DataFrame(logs).to_csv("BERT_regression_training_log.csv", index=False)
+    pd.DataFrame(logs).to_csv("./checkpoints/BERT_regression_training_log.csv", index=False)
     print("Saved log to BERT_regression_training_log.csv")
 
 
