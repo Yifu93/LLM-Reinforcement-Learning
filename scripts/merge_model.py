@@ -1,8 +1,8 @@
 # This script merges a LoRA model into its base model and saves the merged model.
 """
 python -m scripts.merge_model \
-  --lora_dir checkpoints/SFT_SmolTak \
-  --save_path checkpoints/merged_SmolTak
+  --lora_dir checkpoints/DPO_ultrafeedback_lora \
+  --save_path checkpoints/merged_DPO_ultrafeedback_lora
 """
 
 import argparse
@@ -15,32 +15,32 @@ def merge_lora_model(lora_dir: str, save_path: str):
     """
     Merge a LoRA adapter into the base model and save the merged model.
     """
-    print(f"🔍 Loading PEFT config from {lora_dir}")
+    print(f">>>>>> Loading PEFT config from {lora_dir}")
     peft_config = PeftConfig.from_pretrained(lora_dir)
 
     base_model_name = peft_config.base_model_name_or_path
-    print(f"📦 Base model: {base_model_name}")
+    print(f">>>>>> Base model: {base_model_name}")
 
-    BASE_MODEL_PATH = "./qwen2_model"  # Path to the base model
+    BASE_MODEL_PATH = "./checkpoints/merged_SmolTak"  # Path to the base model
     base_model = load_model(BASE_MODEL_PATH, dtype="bf16")
 
-    print(f"🔧 Applying LoRA from {lora_dir}")
+    print(f">>>>>> Applying LoRA from {lora_dir}")
     lora_model = PeftModel.from_pretrained(base_model, lora_dir)
 
-    print("🧩 Merging LoRA weights into base model …")
+    print(">>>>>> Merging LoRA weights into base model …")
     merged_model = lora_model.merge_and_unload()
 
-    print(f"💾 Saving merged model to {save_path}")
+    print(f">>>>>> Saving merged model to {save_path}")
     save_model(merged_model, save_path)
 
     # 🔧 Save tokenizer so merged model is loadable
     tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL_PATH, trust_remote_code=True)
     tokenizer.save_pretrained(save_path)
 
-    print("✅ Merge complete.")
+    print(">>>>>> Merge complete.")
 
     # Test the merged model
-    print("🔍 Testing merged model...")
+    print(">>>>>> Testing merged model...")
 
     MERGED_MODEL_PATH = save_path
 
