@@ -31,8 +31,10 @@ from functions.countdown import compute_score, extract_solution
 
 # Location of the raw eval files (plain JSON, **not** dataset-dict)
 EVAL_DATASETS = {
-    "math": "data/leader_board/countdown.json",
-    "text": "data/leader_board/ultrafeedback.json",
+    # "math": "data/leader_board/countdown.json",
+    # "text": "data/leader_board/ultrafeedback.json",
+    "text": "data/leader_board/ultrafeedback_heldout_prompt.json",
+    "math": "data/leader_board/countdown_heldout_prompts.json",
 }
 
 # ──────────────────────────────────────────────────────────────
