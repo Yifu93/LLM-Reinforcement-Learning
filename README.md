@@ -30,13 +30,21 @@ data/
 └── WarmStart Dataset  # Supervised fine-tuning (SFT) for question-answers
 └── Countdown_dataset  # TinyZero sets without → Need Rule-Based Reward Function (DPO/RLOO)
 ```
+
 Data downloaded from Hugging Face Hub
+
 -- Instrcution Following Dataset --
+
 (1) SmolTalk (Dataset for SFT): https://huggingface.co/datasets/HuggingFaceTB/smol-smoltalk
+
 (2) UltraFeedback (Dataset for DPO and RLOO): https://huggingface.co/datasets/HuggingFaceH4/ultrafeedback_binarized
+
 -- Verifier-Based Dataset --
+
 (3) WarmStart (Dataset for SFT): https://huggingface.co/datasets/Asap7772/cog_behav_all_strategies
+
 (4) PromptsDataset from TinyZero (RLOO): https://huggingface.co/datasets/Jiayi-Pan/Countdown-Tasks-3to4
+
 (5) On-Policy Preference Dataset (the same as PromptsDataset, DPO): https://huggingface.co/datasets/Jiayi-Pan/Countdown-Tasks-3to4
 
 **For training:**
